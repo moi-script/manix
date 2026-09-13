@@ -27,6 +27,8 @@ Chapters come from the [MangaDex API](https://api.mangadex.org/docs/). Manix fol
 npm install
 cp apps/server/.env.example apps/server/.env   # then fill in the secrets and MONGODB_URI
 cp apps/web/.env.example apps/web/.env.local   # SERVER_API_URL defaults to http://localhost:4000
+# Optional: set the same INTERNAL_API_TOKEN in both .env files (see the comments in each
+# .env.example for what it's for and how to generate one).
 npm run dev                                     # API on :4000 and web on :3000
 ```
 
@@ -46,13 +48,20 @@ npm run dev                                     # API on :4000 and web on :3000
 
 ## Deployment notes
 
-- The web app needs `SERVER_API_URL` pointing at the API. Browsers reach the API only through
-  the web app's `/api` and `/img` rewrites.
-- Set the API's `TRUST_PROXY` to the number of proxies in front of it so client IPs used by rate
-  limits are read correctly: `1` when only the web app proxies it, `2` when a CDN or load
-  balancer sits in front of the web app. Whichever proxy is directly in front of Express must
-  forward `X-Forwarded-For`. The Express port itself must not be publicly reachable — only the
-  web app or reverse proxy in front of it should be exposed to the internet.
+- The web app needs `SERVER_API_URL` pointing at the API, set both when running `next build`
+  and at runtime — Next resolves rewrite destinations at build time, so a value that's only
+  present at runtime has no effect. Browsers reach the API only through the web app's `/api`
+  and `/img` rewrites.
+- Production requires a reverse proxy (nginx, Caddy, a load balancer, or a CDN) in front of the
+  web app that sets or appends `X-Forwarded-For` from the client's socket address. The Express
+  API's port must not be publicly reachable — only the reverse proxy (or the web app it fronts)
+  should be exposed to the internet.
+- Set the API's `TRUST_PROXY` to the number of proxies *in front of Express* that append
+  `X-Forwarded-For`. Next's own rewrite does not append it — it just forwards the request — so
+  with one reverse proxy in front of the web app, use `TRUST_PROXY=1` on the API (not `2`).
+- Set `INTERNAL_API_TOKEN` to the same random value on both apps. This lets the web app's
+  server-side fetches (made on behalf of every visitor who hits a cached page) skip the API's
+  per-IP rate limiters, which would otherwise see all that shared traffic as one IP.
 - Put a CDN in front of `/img/*`. Cover images are immutable for a year. Chapter page images are
   cacheable for a day at the edge but shared caches (`s-maxage`) should only hold them for up to
   an hour, so a `block-group` run is reflected promptly; if a scanlation group is blocked, purge

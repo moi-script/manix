@@ -26,6 +26,9 @@ const EnvSchema = z.object({
   MANGADEX_UPLOADS_URL: z.string().url().default("https://uploads.mangadex.org"),
   MANGADEX_REPORT_URL: z.string().url().default("https://api.mangadex.network/report"),
   TRUST_PROXY: z.string().default("1").transform(parseTrustProxy),
+  // Shared secret that lets the web app's server-side fetches skip the per-IP rate limiters,
+  // since those fetches are made on behalf of many visitors but come from one trusted caller.
+  INTERNAL_API_TOKEN: z.string().min(32).optional(),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

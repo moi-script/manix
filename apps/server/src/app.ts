@@ -5,6 +5,7 @@ import helmet from "helmet";
 import path from "node:path";
 import type { Env } from "./config/env";
 import { errorHandler, HttpError, notFound } from "./lib/errors";
+import { isInternalRequest } from "./lib/internal-request";
 import { authenticate } from "./modules/auth/auth.middleware";
 import { authRouter } from "./modules/auth/auth.routes";
 import { catalogRouter } from "./modules/catalog/catalog.routes";
@@ -52,7 +53,7 @@ export function createApp({ env, mangadex, fetchImpl = fetch }: AppDeps) {
     limit: 300,
     standardHeaders: "draft-7",
     legacyHeaders: false,
-    skip: () => env.NODE_ENV === "test",
+    skip: (req) => env.NODE_ENV === "test" || isInternalRequest(req, env.INTERNAL_API_TOKEN),
     handler: (_req, _res, next) => next(new HttpError(429, "rate_limited", "Too many requests, slow down")),
   });
   // A chapter is ~50 images, so this comfortably covers normal reading.
@@ -61,7 +62,7 @@ export function createApp({ env, mangadex, fetchImpl = fetch }: AppDeps) {
     limit: 900,
     standardHeaders: "draft-7",
     legacyHeaders: false,
-    skip: () => env.NODE_ENV === "test",
+    skip: (req) => env.NODE_ENV === "test" || isInternalRequest(req, env.INTERNAL_API_TOKEN),
     handler: (_req, _res, next) => next(new HttpError(429, "rate_limited", "Too many requests, slow down")),
   });
   app.use("/api", apiLimiter);
