@@ -12,6 +12,8 @@ import { ChapterPagesService } from "./modules/catalog/chapter-pages.service";
 import { DiskCache } from "./modules/images/disk-cache";
 import { ImageService } from "./modules/images/image.service";
 import { imagesRouter } from "./modules/images/images.routes";
+import { libraryRouter } from "./modules/library/library.routes";
+import { LibraryService } from "./modules/library/library.service";
 import type { MangaDexApi } from "./modules/sources/mangadex/client";
 
 export interface AppDeps {
@@ -32,6 +34,7 @@ export function createApp({ env, mangadex, fetchImpl = fetch }: AppDeps) {
     uploadsUrl: env.MANGADEX_UPLOADS_URL,
     reportUrl: env.MANGADEX_REPORT_URL,
   });
+  const library = new LibraryService(catalog);
 
   const app = express();
   app.disable("x-powered-by");
@@ -46,6 +49,7 @@ export function createApp({ env, mangadex, fetchImpl = fetch }: AppDeps) {
   });
   app.use("/api/auth", authRouter(env));
   app.use("/api", catalogRouter({ env, catalog, pages }));
+  app.use("/api", libraryRouter(library));
   app.use("/img", imagesRouter(images));
 
   app.use(notFound);
