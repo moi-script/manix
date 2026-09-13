@@ -1,12 +1,21 @@
 {
   "name": "manix",
   "private": true,
-  "workspaces": ["packages/*", "apps/*"],
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
   "scripts": {
+    "dev": "concurrently -n server,web -c yellow,magenta \"npm run dev:server\" \"npm run dev:web\"",
     "dev:server": "npm run dev -w @manix/server",
     "dev:web": "npm run dev -w @manix/web",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
-  "engines": { "node": ">=22" }
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "concurrently": "^9.2.4"
+  }
 }
