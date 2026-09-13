@@ -1,0 +1,9 @@
+{
+  "result": "ok",
+  "baseUrl": "https://node1.example-mdah.net:443/token123",
+  "chapter": {
+    "hash": "3303dd03ac8d27452cce3f2a882e94b2",
+    "data": ["1-aaa.png", "2-bbb.png"],
+    "dataSaver": ["1-aaa.jpg", "2-bbb.jpg"]
+  }
+}

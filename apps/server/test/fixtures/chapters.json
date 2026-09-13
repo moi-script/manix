@@ -1,0 +1,44 @@
+{
+  "result": "ok",
+  "limit": 500,
+  "offset": 0,
+  "total": 4,
+  "data": [
+    {
+      "id": "c0000000-0000-4000-8000-000000000004",
+      "type": "chapter",
+      "attributes": { "volume": "1", "chapter": "3", "title": "Chapter Three", "translatedLanguage": "en", "externalUrl": null, "publishAt": "2024-01-03T00:00:00+00:00", "pages": 2 },
+      "relationships": [
+        { "id": "aaaaaaaa-0000-4000-8000-000000000001", "type": "scanlation_group", "attributes": { "name": "Alpha Scans" } },
+        { "id": "32d76d19-8a05-4db0-9fc2-e0b0648fe9d0", "type": "manga" }
+      ]
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000001",
+      "type": "chapter",
+      "attributes": { "volume": "1", "chapter": "1", "title": "The Weakest Hunter", "translatedLanguage": "en", "externalUrl": null, "publishAt": "2024-01-01T00:00:00+00:00", "pages": 2 },
+      "relationships": [
+        { "id": "aaaaaaaa-0000-4000-8000-000000000001", "type": "scanlation_group", "attributes": { "name": "Alpha Scans" } },
+        { "id": "32d76d19-8a05-4db0-9fc2-e0b0648fe9d0", "type": "manga" }
+      ]
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000003",
+      "type": "chapter",
+      "attributes": { "volume": "1", "chapter": "2", "title": null, "translatedLanguage": "en", "externalUrl": null, "publishAt": "2024-01-02T12:00:00+00:00", "pages": 2 },
+      "relationships": [
+        { "id": "bbbbbbbb-0000-4000-8000-000000000002", "type": "scanlation_group", "attributes": { "name": "Beta Group" } },
+        { "id": "32d76d19-8a05-4db0-9fc2-e0b0648fe9d0", "type": "manga" }
+      ]
+    },
+    {
+      "id": "c0000000-0000-4000-8000-000000000002",
+      "type": "chapter",
+      "attributes": { "volume": "1", "chapter": "2", "title": "Double Dungeon", "translatedLanguage": "en", "externalUrl": null, "publishAt": "2024-01-02T00:00:00+00:00", "pages": 2 },
+      "relationships": [
+        { "id": "aaaaaaaa-0000-4000-8000-000000000001", "type": "scanlation_group", "attributes": { "name": "Alpha Scans" } },
+        { "id": "32d76d19-8a05-4db0-9fc2-e0b0648fe9d0", "type": "manga" }
+      ]
+    }
+  ]
+}

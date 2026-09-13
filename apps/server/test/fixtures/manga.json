@@ -1,0 +1,26 @@
+{
+  "result": "ok",
+  "data": {
+    "id": "32d76d19-8a05-4db0-9fc2-e0b0648fe9d0",
+    "type": "manga",
+    "attributes": {
+      "title": { "en": "Solo Leveling" },
+      "altTitles": [{ "ko": "Na Honjaman Rebeleop (ko)" }, { "ko-ro": "Na Honjaman Rebeleop" }, { "en": "Solo Leveling" }],
+      "description": { "ko": "Korean description", "en": "10 years ago, after the Gate appeared." },
+      "originalLanguage": "ko",
+      "status": "completed",
+      "year": 2018,
+      "contentRating": "safe",
+      "tags": [
+        { "id": "391b0423-d847-456f-aff0-8b0cfc03066b", "type": "tag", "attributes": { "name": { "en": "Action" }, "group": "genre" } },
+        { "id": "cdc58593-87dd-415e-bbc0-2ec27bf404cc", "type": "tag", "attributes": { "name": { "en": "Fantasy" }, "group": "genre" } }
+      ],
+      "updatedAt": "2024-05-01T10:00:00+00:00"
+    },
+    "relationships": [
+      { "id": "0d1f2a77-4a7e-4d2c-9a55-5b0f1e3c1a01", "type": "author", "attributes": { "name": "Chugong" } },
+      { "id": "0d1f2a77-4a7e-4d2c-9a55-5b0f1e3c1a02", "type": "artist", "attributes": { "name": "DUBU (REDICE STUDIO)" } },
+      { "id": "0d1f2a77-4a7e-4d2c-9a55-5b0f1e3c1a03", "type": "cover_art", "attributes": { "fileName": "e90bdc47-c8b9-4df7-b2c0-17641b645ee1.jpg" } }
+    ]
+  }
+}
