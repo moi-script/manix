@@ -72,14 +72,14 @@ export function authRouter(env: Env): Router {
   router.post("/refresh", async (req, res) => {
     const token: unknown = req.cookies?.[REFRESH_COOKIE];
     if (typeof token !== "string") throw new HttpError(401, "invalid_refresh", "No active session");
-    try {
-      const result = await service.refresh(token, req.get("user-agent") ?? "");
-      setAuthCookies(res, result);
-      res.json({ user: toUserDTO(result.user) });
-    } catch (err) {
-      clearAuthCookies(res);
-      throw err;
-    }
+    // Do not clear auth cookies on failure: a concurrent refresh from the same browser
+    // (e.g. two tabs) may have already rotated the token, so a "stale" request here isn't
+    // necessarily the user's session actually ending. Clearing cookies would log a still
+    // -valid session out from under the user. The client should treat a 401 here as "retry
+    // login", not as proof the whole session is gone.
+    const result = await service.refresh(token, req.get("user-agent") ?? "");
+    setAuthCookies(res, result);
+    res.json({ user: toUserDTO(result.user) });
   });
 
   router.post("/logout", async (req, res) => {

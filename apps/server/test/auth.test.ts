@@ -77,6 +77,26 @@ describe("auth", () => {
     expect(reuse.status).toBe(401);
   });
 
+  it("does not clear auth cookies when a stale refresh token is rejected after a successful rotation", async () => {
+    const agent = request.agent(app);
+    const reg = await agent.post("/api/auth/register").send(credentials);
+    const oldRefresh = cookieValue(reg, "mx_rt");
+
+    const rotated = await agent.post("/api/auth/refresh");
+    expect(rotated.status).toBe(200);
+
+    // A second tab/request still holding the now-stale (rotated-away) refresh token.
+    const stale = await request(app).post("/api/auth/refresh").set("Cookie", `mx_rt=${oldRefresh}`);
+    expect(stale.status).toBe(401);
+    const setCookie = (stale.headers["set-cookie"] as unknown as string[] | undefined) ?? [];
+    const clears = setCookie.filter((c) => /^(mx_at|mx_rt)=;/.test(c) || /^(mx_at|mx_rt)=$/.test(c));
+    expect(clears).toEqual([]);
+
+    // The session rotated in the first request is still usable.
+    const me = await agent.get("/api/auth/me");
+    expect(me.status).toBe(200);
+  });
+
   it("logs out and invalidates the session", async () => {
     const agent = request.agent(app);
     await agent.post("/api/auth/register").send(credentials);
@@ -90,5 +110,16 @@ describe("auth", () => {
     const res = await request(app).get("/api/auth/me");
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe("unauthorized");
+  });
+
+  it("maps a duplicate-registration race to one 201 and one 409, not a 500", async () => {
+    const [first, second] = await Promise.all([
+      request(app).post("/api/auth/register").send(credentials),
+      request(app).post("/api/auth/register").send({ ...credentials, username: "someone_else" }),
+    ]);
+    const statuses = [first.status, second.status].sort();
+    expect(statuses).toEqual([201, 409]);
+    const failed = first.status === 409 ? first : second;
+    expect(failed.body.error.code).toBe("email_taken");
   });
 });

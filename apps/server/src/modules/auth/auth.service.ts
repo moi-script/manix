@@ -11,6 +11,16 @@ export interface AuthResult {
   refreshToken: string;
 }
 
+interface MongoDuplicateKeyError {
+  code: number;
+  keyPattern?: Record<string, unknown>;
+  keyValue?: Record<string, unknown>;
+}
+
+function isDuplicateKeyError(err: unknown): err is MongoDuplicateKeyError {
+  return typeof err === "object" && err !== null && "code" in err && (err as { code: unknown }).code === 11000;
+}
+
 export class AuthService {
   constructor(private readonly env: Env) {}
 
@@ -22,7 +32,19 @@ export class AuthService {
       throw new HttpError(409, "username_taken", "Username is taken");
     }
     const passwordHash = await bcrypt.hash(input.password, this.env.BCRYPT_COST);
-    const user = await User.create({ email, username: input.username, passwordHash });
+    let user: UserDoc;
+    try {
+      user = await User.create({ email, username: input.username, passwordHash });
+    } catch (err) {
+      // Two concurrent registrations can both pass the findOne check above before either
+      // insert lands; the unique index is the real source of truth, so map its duplicate
+      // key error the same way as the pre-check.
+      if (isDuplicateKeyError(err)) {
+        if (err.keyPattern && "email" in err.keyPattern) throw new HttpError(409, "email_taken", "Email is already registered");
+        throw new HttpError(409, "username_taken", "Username is taken");
+      }
+      throw err;
+    }
     return this.issue(user, userAgent);
   }
 

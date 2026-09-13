@@ -10,12 +10,12 @@ export interface AccessPayload {
 }
 
 export function signAccessToken(payload: AccessPayload, secret: string): string {
-  return jwt.sign(payload, secret, { expiresIn: ACCESS_TTL_SECONDS });
+  return jwt.sign(payload, secret, { algorithm: "HS256", expiresIn: ACCESS_TTL_SECONDS });
 }
 
 export function verifyAccessToken(token: string, secret: string): AccessPayload | null {
   try {
-    const decoded = jwt.verify(token, secret);
+    const decoded = jwt.verify(token, secret, { algorithms: ["HS256"] });
     if (typeof decoded === "string" || typeof decoded.sub !== "string") return null;
     return { sub: decoded.sub, role: decoded.role === "admin" ? "admin" : "user" };
   } catch {
