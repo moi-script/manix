@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Black_Han_Sans, Gothic_A1 } from "next/font/google";
 import type { ReactNode } from "react";
+import { AuthProvider } from "@/components/auth-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import "./globals.css";
@@ -28,9 +29,11 @@ export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${sans.variable}`}>
       <body className="flex min-h-dvh flex-col">
-        <SiteHeader />
-        <main className="flex-1">{children}</main>
-        <SiteFooter />
+        <AuthProvider>
+          <SiteHeader />
+          <main className="flex-1">{children}</main>
+          <SiteFooter />
+        </AuthProvider>
       </body>
     </html>
   );

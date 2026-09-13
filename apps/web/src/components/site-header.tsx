@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { UserMenu } from "@/components/user-menu";
 
 export function SiteHeader() {
   return (
@@ -18,6 +19,9 @@ export function SiteHeader() {
             History
           </Link>
         </nav>
+        <div className="ml-auto">
+          <UserMenu />
+        </div>
       </div>
     </header>
   );
