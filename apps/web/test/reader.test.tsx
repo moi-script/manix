@@ -94,6 +94,11 @@ describe("Reader", () => {
     render(<Reader chapter={sampleChapterDetail} manga={sampleManga} />);
     await screen.findAllByRole("img", { name: /^Page \d of 2$/ });
     expect(callsTo(fetchMock, "/api/progress")).toHaveLength(0);
+    // Let the resume-positioning effect (setPage/setPositioned) fully settle before the
+    // progress-save debounce timer is expected to start counting down.
+    await act(async () => {
+      await Promise.resolve();
+    });
 
     await act(async () => {
       await vi.advanceTimersByTimeAsync(PROGRESS_DEBOUNCE_MS);
@@ -132,6 +137,35 @@ describe("Reader", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("This chapter's pages didn't load.");
     await user.click(screen.getByRole("button", { name: "Try again" }));
     expect(await screen.findAllByRole("img", { name: /^Page \d of 2$/ })).toHaveLength(2);
+  });
+
+  it("resumes at the requested page in page-by-page mode", async () => {
+    window.localStorage.setItem(PREFS_KEY, JSON.stringify({ mode: "paged", dataSaver: false }));
+    stubApi();
+    render(<Reader chapter={sampleChapterDetail} manga={sampleManga} initialPage={1} />);
+
+    expect(await screen.findByText("Page 2 of 2")).toBeInTheDocument();
+  });
+
+  it("saves progress at the resumed page, not page 0, when signed in", async () => {
+    mocks.user = sampleUser;
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const fetchMock = stubApi();
+    render(<Reader chapter={sampleChapterDetail} manga={sampleManga} initialPage={1} />);
+    await screen.findAllByRole("img", { name: /^Page \d of 2$/ });
+    // Let the resume-positioning effect (setPage/setPositioned) fully settle before the
+    // progress-save debounce timer is expected to start counting down.
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(PROGRESS_DEBOUNCE_MS * 2);
+    });
+
+    await waitFor(() => expect(callsTo(fetchMock, "/api/progress")).toHaveLength(1));
+    const [, init] = callsTo(fetchMock, "/api/progress")[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({ mangaId: MANGA_ID, chapterId: CH1, chapterNumber: "1", page: 1, totalPages: 2 });
   });
 
   it("explains rate limiting in plain words", async () => {

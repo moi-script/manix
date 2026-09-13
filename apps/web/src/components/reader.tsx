@@ -20,7 +20,15 @@ const toolButton =
 const primaryButton = "rounded-sm bg-marker px-5 py-2.5 font-medium text-ink";
 const secondaryButton = "rounded-sm border border-rule px-5 py-2.5 text-paper hover:bg-gutter";
 
-export function Reader({ chapter, manga }: { chapter: ChapterDetailDTO; manga: MangaDTO }) {
+export function Reader({
+  chapter,
+  manga,
+  initialPage = 0,
+}: {
+  chapter: ChapterDetailDTO;
+  manga: MangaDTO;
+  initialPage?: number;
+}) {
   const router = useRouter();
   const { user } = useAuth();
   const [prefs, setPrefs] = useState<ReaderPrefs>(DEFAULT_PREFS);
@@ -32,6 +40,7 @@ export function Reader({ chapter, manga }: { chapter: ChapterDetailDTO; manga: M
   const [scrollingDown, setScrollingDown] = useState(false);
   const imageRefs = useRef<(HTMLImageElement | null)[]>([]);
   const warmedNext = useRef(false);
+  const [positioned, setPositioned] = useState(false);
 
   const pages = pagesState.status === "ready" ? pagesState.pages : NO_PAGES;
   const total = pages.length;
@@ -66,6 +75,17 @@ export function Reader({ chapter, manga }: { chapter: ChapterDetailDTO; manga: M
       cancelled = true;
     };
   }, [chapter.id, quality, attempt, prefsReady]);
+
+  // Jump to the requested resume page once per chapter mount, after pages are known.
+  useEffect(() => {
+    if (positioned || pagesState.status !== "ready" || total === 0) return;
+    const clamped = Math.min(Math.max(initialPage, 0), total - 1);
+    setPage(clamped);
+    setPositioned(true);
+    if (prefs.mode === "strip") {
+      requestAnimationFrame(() => imageRefs.current[clamped]?.scrollIntoView?.({ block: "start" }));
+    }
+  }, [positioned, pagesState.status, total, initialPage, prefs.mode]);
 
   const goToChapter = useCallback(
     (id: string | null) => {
@@ -103,7 +123,7 @@ export function Reader({ chapter, manga }: { chapter: ChapterDetailDTO; manga: M
 
   // Save progress once the reader settles on a page.
   useEffect(() => {
-    if (!user || total === 0) return;
+    if (!user || total === 0 || !positioned) return;
     const timer = setTimeout(() => {
       api("/api/progress", {
         method: "PUT",
@@ -111,7 +131,7 @@ export function Reader({ chapter, manga }: { chapter: ChapterDetailDTO; manga: M
       }).catch(() => undefined);
     }, PROGRESS_DEBOUNCE_MS);
     return () => clearTimeout(timer);
-  }, [user, page, total, manga.id, chapter.id, chapter.number]);
+  }, [user, page, total, positioned, manga.id, chapter.id, chapter.number]);
 
   // Long strip: track the current page, and slide the toolbar away while scrolling down.
   useEffect(() => {
@@ -191,7 +211,7 @@ export function Reader({ chapter, manga }: { chapter: ChapterDetailDTO; manga: M
         }`}
       >
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-4 gap-y-2 px-4 py-2 text-sm">
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 basis-full sm:basis-auto sm:flex-1">
             <Link href={`/title/${manga.id}`} className="block truncate text-dusk hover:text-paper">
               {manga.title}
             </Link>

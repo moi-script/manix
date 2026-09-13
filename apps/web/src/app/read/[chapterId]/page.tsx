@@ -9,6 +9,13 @@ import { chapterLabel } from "@/lib/format";
 import { serverApi } from "@/lib/server-api";
 
 type Params = Promise<{ chapterId: string }>;
+type SearchParams = Promise<Record<string, string | string[] | undefined>>;
+
+function parsePage(value: string | string[] | undefined): number {
+  const raw = Array.isArray(value) ? value[0] : value;
+  const parsed = raw ? Number.parseInt(raw, 10) : Number.NaN;
+  return Number.isInteger(parsed) && parsed >= 1 ? parsed : 1;
+}
 
 const getChapter = cache(async (id: string) => {
   const res = await serverApi<{ chapter: ChapterDetailDTO }>(`/api/chapters/${encodeURIComponent(id)}`, { revalidate: 600 });
@@ -41,8 +48,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
   }
 }
 
-export default async function ReadPage({ params }: { params: Params }) {
+export default async function ReadPage({ params, searchParams }: { params: Params; searchParams: SearchParams }) {
   const { chapterId } = await params;
+  const { page } = await searchParams;
+  const initialPage = parsePage(page) - 1;
   const { chapter, manga } = await load(chapterId);
 
   if (chapter.externalUrl) {
@@ -68,5 +77,5 @@ export default async function ReadPage({ params }: { params: Params }) {
     );
   }
 
-  return <Reader key={chapter.id} chapter={chapter} manga={manga} />;
+  return <Reader key={chapter.id} chapter={chapter} manga={manga} initialPage={initialPage} />;
 }

@@ -50,7 +50,7 @@ describe("ReadActions", () => {
     );
 
     render(<ReadActions mangaId={MANGA_ID} firstChapterId={CH1} />);
-    expect(await screen.findByRole("link", { name: "Continue chapter 2" })).toHaveAttribute("href", `/read/${CH2}`);
+    expect(await screen.findByRole("link", { name: "Continue chapter 2" })).toHaveAttribute("href", `/read/${CH2}?page=5`);
     expect(screen.getByRole("combobox", { name: "Library" })).toHaveValue("reading");
   });
 

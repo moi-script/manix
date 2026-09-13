@@ -36,7 +36,7 @@ describe("ContinueReading", () => {
     render(<ContinueReading />);
 
     const link = await screen.findByRole("link", { name: /Solo Leveling/ });
-    expect(link).toHaveAttribute("href", `/read/${CH2}`);
+    expect(link).toHaveAttribute("href", `/read/${CH2}?page=5`);
     expect(link).toHaveTextContent("Chapter 2, page 5 of 20");
     expect(screen.getAllByRole("link")).toHaveLength(1);
     expect(screen.getByRole("heading", { name: "Continue reading" })).toBeInTheDocument();

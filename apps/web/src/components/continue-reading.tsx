@@ -37,7 +37,10 @@ export function ContinueReading() {
       <ul className="mt-4 grid snap-x auto-cols-[80%] grid-flow-col gap-4 overflow-x-auto pb-3 sm:auto-cols-[45%] lg:auto-cols-[30%]">
         {items.map((item) => (
           <li key={item.mangaId} className="snap-start">
-            <Link href={`/read/${item.chapterId}`} className="flex gap-3 rounded-sm bg-gutter p-3 hover:bg-rule">
+            <Link
+              href={`/read/${item.chapterId}?page=${item.page + 1}`}
+              className="flex gap-3 rounded-sm bg-gutter p-3 hover:bg-rule"
+            >
               <span className="h-24 w-[4.5rem] shrink-0 overflow-hidden rounded-sm bg-ink">
                 {item.manga?.coverUrl && (
                   // eslint-disable-next-line @next/next/no-img-element -- served and cached by the image proxy

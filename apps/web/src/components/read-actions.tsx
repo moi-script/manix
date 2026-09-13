@@ -60,7 +60,11 @@ export function ReadActions({ mangaId, firstChapterId }: { mangaId: string; firs
     }
   }
 
-  const readHref = progress ? `/read/${progress.chapterId}` : firstChapterId ? `/read/${firstChapterId}` : null;
+  const readHref = progress
+    ? `/read/${progress.chapterId}?page=${progress.page + 1}`
+    : firstChapterId
+      ? `/read/${firstChapterId}`
+      : null;
   const readLabel = progress
     ? progress.chapterNumber
       ? `Continue chapter ${progress.chapterNumber}`
