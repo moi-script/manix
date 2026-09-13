@@ -37,10 +37,18 @@ npm run dev:server                              # http://localhost:4000
 | `npm test` | Run all workspace tests (downloads a MongoDB binary on first run) |
 | `npm run typecheck` | Type-check all workspaces |
 | `npm run build -w @manix/server` then `npm start -w @manix/server` | Production build and run |
+| `npm run block-group -w @manix/server -- <groupId> <reason>` | Block a scanlation group (dev, via tsx) |
+| `npm run block-group:prod -w @manix/server -- <groupId> <reason>` | Block a scanlation group (after `npm run build`) |
 
 ## Deployment notes
 
-- The API trusts one proxy hop (`trust proxy = 1`) for client IPs used by rate limits. The web
-  app (or load balancer) in front of it must forward `X-Forwarded-For`.
-- Put a CDN in front of `/img/*`; responses are immutable for a year.
+- Set `TRUST_PROXY` to the number of reverse-proxy hops in front of Express (default `1`) so
+  client IPs used by rate limits are read correctly; the web app / load balancer in front of it
+  must forward `X-Forwarded-For`. The Express port itself must not be publicly reachable — only
+  the web app or reverse proxy in front of it should be exposed to the internet.
+- Put a CDN in front of `/img/*`. Cover images are immutable for a year. Chapter page images are
+  cacheable for a day at the edge but shared caches (`s-maxage`) should only hold them for up to
+  an hour, so a `block-group` run is reflected promptly; if a scanlation group is blocked, purge
+  `/img/ch/*` for its chapters from the CDN, or wait up to an hour for shared caches to expire it
+  on their own.
 - `IMAGE_CACHE_DIR` should be on persistent disk.

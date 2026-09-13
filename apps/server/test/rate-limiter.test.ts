@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RateLimiter } from "../src/lib/rate-limiter";
+import { RateLimiter, RateLimitQueueFullError } from "../src/lib/rate-limiter";
 
 describe("RateLimiter", () => {
   afterEach(() => {
@@ -37,5 +37,24 @@ describe("RateLimiter", () => {
   it("builds per-second and per-minute limiters", () => {
     expect(RateLimiter.perSecond(4)).toBeInstanceOf(RateLimiter);
     expect(RateLimiter.perMinute(36)).toBeInstanceOf(RateLimiter);
+  });
+
+  it("rejects with RateLimitQueueFullError when the wait would exceed maxWaitMs, without reserving a slot", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(0);
+    const limiter = new RateLimiter(250, undefined, undefined, 100);
+
+    // First task starts immediately (no wait), reserving the next slot at 250.
+    await limiter.schedule(async () => undefined);
+
+    // A second task right now would need to wait 250ms, which exceeds maxWaitMs of 100.
+    await expect(limiter.schedule(async () => undefined)).rejects.toBeInstanceOf(RateLimitQueueFullError);
+
+    // Because the rejected call did not reserve a slot, a task scheduled at t=200 should
+    // only need to wait 50ms (until the still-pending slot at 250), not longer.
+    vi.setSystemTime(200);
+    const startPromise = limiter.schedule(async () => Date.now());
+    await vi.advanceTimersByTimeAsync(50);
+    await expect(startPromise).resolves.toBe(250);
   });
 });

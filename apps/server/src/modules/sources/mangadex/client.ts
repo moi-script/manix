@@ -1,4 +1,4 @@
-import { RateLimiter } from "../../../lib/rate-limiter";
+import { RateLimiter, RateLimitQueueFullError } from "../../../lib/rate-limiter";
 
 export type Query = Record<string, string | number | boolean | string[] | undefined>;
 
@@ -61,8 +61,8 @@ export class MangaDexClient implements MangaDexApi {
 
   constructor(private readonly options: MangaDexClientOptions) {
     this.fetchImpl = options.fetchImpl ?? fetch;
-    this.limiter = options.limiter ?? RateLimiter.perSecond(4);
-    this.atHomeLimiter = options.atHomeLimiter ?? RateLimiter.perMinute(36);
+    this.limiter = options.limiter ?? RateLimiter.perSecond(4, 10_000);
+    this.atHomeLimiter = options.atHomeLimiter ?? RateLimiter.perMinute(36, 30_000);
     this.maxRetries = options.maxRetries ?? 3;
     this.breakerMs = options.breakerMs ?? 60_000;
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
@@ -94,7 +94,10 @@ export class MangaDexClient implements MangaDexApi {
             signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
           }),
         );
-      } catch {
+      } catch (err) {
+        if (err instanceof RateLimitQueueFullError) {
+          throw new MangaDexError(503, "MangaDex request queue is full");
+        }
         if (attempt < this.maxRetries) {
           await this.sleep(1000 * 2 ** attempt);
           continue;

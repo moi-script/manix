@@ -1,7 +1,7 @@
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Chapter } from "../src/modules/catalog/chapter.model";
-import { findNeighbors } from "../src/modules/catalog/catalog.service";
+import { CatalogService, findNeighbors, NEGATIVE_CACHE_TTL_MS } from "../src/modules/catalog/catalog.service";
 import { Manga } from "../src/modules/catalog/manga.model";
 import { BlockedGroup } from "../src/modules/moderation/blocked-group.model";
 import { MangaDexError, type Query } from "../src/modules/sources/mangadex/client";
@@ -165,6 +165,22 @@ describe("catalog", () => {
     const res = await request(app).get(`/api/chapters/${CH2B}`);
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe("chapter_unavailable");
+  });
+
+  it("negatively caches an unknown manga id so a second lookup skips MangaDex, and expires after 10 minutes", async () => {
+    const unknownId = "11111111-1111-4111-8111-111111111111";
+    let now = 0;
+    const service = new CatalogService(fake.api, () => now);
+
+    await expect(service.getManga(unknownId)).rejects.toMatchObject({ code: "manga_not_found" });
+    expect(fake.get).toHaveBeenCalledTimes(1);
+
+    await expect(service.getManga(unknownId)).rejects.toMatchObject({ code: "manga_not_found" });
+    expect(fake.get).toHaveBeenCalledTimes(1);
+
+    now = NEGATIVE_CACHE_TTL_MS + 1;
+    await expect(service.getManga(unknownId)).rejects.toMatchObject({ code: "manga_not_found" });
+    expect(fake.get).toHaveBeenCalledTimes(2);
   });
 });
 

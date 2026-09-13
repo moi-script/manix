@@ -12,6 +12,9 @@ import { Manga, type MangaCache } from "./manga.model";
 export const MANGA_TTL_MS = 6 * 60 * 60 * 1000;
 export const CHAPTER_TTL_MS = 60 * 60 * 1000;
 export const SEARCH_PAGE_SIZE = 24;
+/** How long a 404/400 from MangaDex for an id is remembered before retrying upstream. */
+export const NEGATIVE_CACHE_TTL_MS = 10 * 60 * 1000;
+const MAX_NEGATIVE_ENTRIES = 10_000;
 const FEED_PAGE_SIZE = 500;
 const MAX_RESULT_WINDOW = 10_000;
 const MANGA_INCLUDES = ["cover_art", "author", "artist"];
@@ -49,6 +52,10 @@ export function findNeighbors(
 }
 
 export class CatalogService {
+  /** Manga/chapter ids MangaDex recently returned 404/400 for, mapped to their expiry. */
+  private readonly mangaMisses = new Map<string, number>();
+  private readonly chapterMisses = new Map<string, number>();
+
   constructor(
     private readonly md: MangaDexApi,
     private readonly now: () => number = () => Date.now(),
@@ -57,6 +64,7 @@ export class CatalogService {
   async getManga(id: string): Promise<MangaDTO> {
     const cached = (await Manga.findOne({ source: "mangadex", sourceId: id }).lean()) as MangaCache | null;
     if (cached && this.isFresh(cached.cachedAt, MANGA_TTL_MS)) return toMangaDTO(cached);
+    if (!cached && this.isNegativelyCached(this.mangaMisses, id)) throw mangaNotFound();
 
     try {
       const res = await this.md.get<MdEntityResponse<MdManga>>(`/manga/${id}`, { includes: MANGA_INCLUDES });
@@ -66,7 +74,10 @@ export class CatalogService {
     } catch (err) {
       if (!(err instanceof MangaDexError)) throw err;
       if (cached) return toMangaDTO(cached);
-      if (err.status === 404 || err.status === 400) throw mangaNotFound();
+      if (err.status === 404 || err.status === 400) {
+        this.recordMiss(this.mangaMisses, id);
+        throw mangaNotFound();
+      }
       throw sourceUnavailable();
     }
   }
@@ -172,6 +183,7 @@ export class CatalogService {
   private async ensureFeed(mangaId: string, language: string): Promise<void> {
     const feed = (await FeedCache.findOne({ mangaSourceId: mangaId, language }).lean()) as FeedCacheAttrs | null;
     if (feed && this.isFresh(feed.cachedAt, CHAPTER_TTL_MS)) return;
+    if (!feed && this.isNegativelyCached(this.mangaMisses, mangaId)) throw mangaNotFound();
 
     let records: ChapterRecord[];
     try {
@@ -179,7 +191,10 @@ export class CatalogService {
     } catch (err) {
       if (!(err instanceof MangaDexError)) throw err;
       if (feed) return;
-      if (err.status === 404 || err.status === 400) throw mangaNotFound();
+      if (err.status === 404 || err.status === 400) {
+        this.recordMiss(this.mangaMisses, mangaId);
+        throw mangaNotFound();
+      }
       throw sourceUnavailable();
     }
 
@@ -220,6 +235,7 @@ export class CatalogService {
   private async findChapter(id: string): Promise<ChapterRecord> {
     const cached = (await Chapter.findOne({ source: "mangadex", sourceId: id }).lean()) as ChapterCache | null;
     if (cached && this.isFresh(cached.cachedAt, CHAPTER_TTL_MS)) return cached;
+    if (!cached && this.isNegativelyCached(this.chapterMisses, id)) throw chapterNotFound();
 
     try {
       const res = await this.md.get<MdEntityResponse<MdChapter>>(`/chapter/${id}`, { includes: ["scanlation_group"] });
@@ -233,8 +249,32 @@ export class CatalogService {
     } catch (err) {
       if (!(err instanceof MangaDexError)) throw err;
       if (cached) return cached;
-      if (err.status === 404 || err.status === 400) throw chapterNotFound();
+      if (err.status === 404 || err.status === 400) {
+        this.recordMiss(this.chapterMisses, id);
+        throw chapterNotFound();
+      }
       throw sourceUnavailable();
+    }
+  }
+
+  /** Whether `id` is in `map` and its negative-cache entry has not expired. Prunes expired entries. */
+  private isNegativelyCached(map: Map<string, number>, id: string): boolean {
+    const expiresAt = map.get(id);
+    if (expiresAt === undefined) return false;
+    if (this.now() >= expiresAt) {
+      map.delete(id);
+      return false;
+    }
+    return true;
+  }
+
+  private recordMiss(map: Map<string, number>, id: string): void {
+    map.delete(id);
+    map.set(id, this.now() + NEGATIVE_CACHE_TTL_MS);
+    while (map.size > MAX_NEGATIVE_ENTRIES) {
+      const oldest = map.keys().next().value;
+      if (oldest === undefined) break;
+      map.delete(oldest);
     }
   }
 

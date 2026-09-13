@@ -1,5 +1,17 @@
 import { z } from "zod";
 
+/**
+ * Express's `trust proxy` setting. A digit string is the number of hops to trust
+ * (e.g. "1"); "true"/"false" toggle trusting all/no proxies; anything else (e.g.
+ * "loopback", a comma-separated subnet list) is passed through as-is.
+ */
+function parseTrustProxy(value: string): number | boolean | string {
+  if (/^\d+$/.test(value)) return Number(value);
+  if (value === "true") return true;
+  if (value === "false") return false;
+  return value;
+}
+
 const EnvSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   PORT: z.coerce.number().int().positive().default(4000),
@@ -13,6 +25,7 @@ const EnvSchema = z.object({
   MANGADEX_API_URL: z.string().url().default("https://api.mangadex.org"),
   MANGADEX_UPLOADS_URL: z.string().url().default("https://uploads.mangadex.org"),
   MANGADEX_REPORT_URL: z.string().url().default("https://api.mangadex.network/report"),
+  TRUST_PROXY: z.string().default("1").transform(parseTrustProxy),
 });
 
 export type Env = z.infer<typeof EnvSchema>;

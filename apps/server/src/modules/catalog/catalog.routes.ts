@@ -15,7 +15,7 @@ export interface CatalogRouterDeps {
 export function catalogRouter({ env, catalog, pages }: CatalogRouterDeps): Router {
   const router = Router();
 
-  // Each page-list request can cost one of our 40/min at-home calls, so cap it per client.
+  // Each page-list request can cost one of our 36/min at-home calls, so cap it per client.
   const pagesLimiter = rateLimit({
     windowMs: 60_000,
     limit: 20,

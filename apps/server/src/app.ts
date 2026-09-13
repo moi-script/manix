@@ -1,9 +1,10 @@
 import cookieParser from "cookie-parser";
 import express from "express";
+import rateLimit from "express-rate-limit";
 import helmet from "helmet";
 import path from "node:path";
 import type { Env } from "./config/env";
-import { errorHandler, notFound } from "./lib/errors";
+import { errorHandler, HttpError, notFound } from "./lib/errors";
 import { authenticate } from "./modules/auth/auth.middleware";
 import { authRouter } from "./modules/auth/auth.routes";
 import { catalogRouter } from "./modules/catalog/catalog.routes";
@@ -38,11 +39,33 @@ export function createApp({ env, mangadex, fetchImpl = fetch }: AppDeps) {
 
   const app = express();
   app.disable("x-powered-by");
-  app.set("trust proxy", 1);
+  app.set("trust proxy", env.TRUST_PROXY);
   app.use(helmet({ crossOriginResourcePolicy: { policy: "same-site" } }));
   app.use(express.json({ limit: "100kb" }));
   app.use(cookieParser());
   app.use(authenticate(env));
+
+  // Shared per-IP budget on top of the more specific per-route limiters, so a single
+  // client can't drain the whole MangaDex request budget across many endpoints.
+  const apiLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 300,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    skip: () => env.NODE_ENV === "test",
+    handler: (_req, _res, next) => next(new HttpError(429, "rate_limited", "Too many requests, slow down")),
+  });
+  // A chapter is ~50 images, so this comfortably covers normal reading.
+  const imgLimiter = rateLimit({
+    windowMs: 60_000,
+    limit: 900,
+    standardHeaders: "draft-7",
+    legacyHeaders: false,
+    skip: () => env.NODE_ENV === "test",
+    handler: (_req, _res, next) => next(new HttpError(429, "rate_limited", "Too many requests, slow down")),
+  });
+  app.use("/api", apiLimiter);
+  app.use("/img", imgLimiter);
 
   app.get("/api/health", (_req, res) => {
     res.json({ ok: true, sourceAvailable: mangadex.isAvailable() });

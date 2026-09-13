@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { RateLimiter } from "../src/lib/rate-limiter";
+import { RateLimiter, RateLimitQueueFullError } from "../src/lib/rate-limiter";
 import { buildQuery, MangaDexClient, MangaDexError } from "../src/modules/sources/mangadex/client";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -100,6 +100,32 @@ describe("MangaDexClient", () => {
     expect(fetchImpl).toHaveBeenCalledTimes(3);
 
     now = 60_001;
+    expect(client.isAvailable()).toBe(true);
+  });
+
+  it("maps a full rate-limiter queue to a 503 without retrying or tripping the breaker", async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse({ result: "ok" }));
+    const queueFullLimiter = {
+      schedule: vi.fn(async () => {
+        throw new RateLimitQueueFullError();
+      }),
+    } as unknown as RateLimiter;
+    const client = new MangaDexClient({
+      baseUrl: "https://api.mangadex.test",
+      userAgent: "Manix-Test/0.0",
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      limiter: queueFullLimiter,
+      atHomeLimiter: queueFullLimiter,
+      sleep: vi.fn(async () => undefined),
+      maxRetries: 2,
+      breakerMs: 60_000,
+    });
+
+    const err = await client.get("/manga").catch((e: unknown) => e);
+    expect(err).toBeInstanceOf(MangaDexError);
+    expect((err as MangaDexError).status).toBe(503);
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(queueFullLimiter.schedule).toHaveBeenCalledTimes(1);
     expect(client.isAvailable()).toBe(true);
   });
 
