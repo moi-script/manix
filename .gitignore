@@ -6,3 +6,5 @@ dist/
 .cache/
 coverage/
 .superpowers/
+next-env.d.ts
+*.tsbuildinfo

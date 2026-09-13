@@ -4,6 +4,7 @@
   "workspaces": ["packages/*", "apps/*"],
   "scripts": {
     "dev:server": "npm run dev -w @manix/server",
+    "dev:web": "npm run dev -w @manix/web",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"
   },
