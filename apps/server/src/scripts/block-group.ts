@@ -1,20 +1,22 @@
 import mongoose from "mongoose";
+import { z } from "zod";
 import { loadEnv } from "../config/env";
+import { loadDotEnvIfPresent } from "../config/load-dotenv";
 import { connectDb } from "../db/connect";
 import { BlockedGroup } from "../modules/moderation/blocked-group.model";
 
-try {
-  process.loadEnvFile(".env");
-} catch {
-  // No .env file: use the real environment.
-}
+const USAGE = "Usage: npm run block-group -w @manix/server -- <scanlationGroupId> <reason...>";
 
-const [groupId, ...reasonWords] = process.argv.slice(2);
-if (!groupId) {
-  console.error("Usage: npm run block-group -w @manix/server -- <scanlationGroupId> <reason...>");
+const [rawGroupId, ...reasonWords] = process.argv.slice(2);
+const parsedGroupId = z.string().uuid().safeParse(rawGroupId);
+if (!parsedGroupId.success) {
+  console.error(USAGE);
+  console.error(`error: <scanlationGroupId> must be a UUID, got: ${rawGroupId ?? "(none)"}`);
   process.exit(1);
 }
+const groupId = parsedGroupId.data;
 
+loadDotEnvIfPresent();
 const env = loadEnv();
 await connectDb(env.MONGODB_URI);
 await BlockedGroup.updateOne(

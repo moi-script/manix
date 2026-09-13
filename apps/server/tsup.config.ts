@@ -1,7 +1,7 @@
 import { defineConfig } from "tsup";
 
 export default defineConfig({
-  entry: ["src/index.ts"],
+  entry: { index: "src/index.ts", "block-group": "src/scripts/block-group.ts" },
   format: ["esm"],
   target: "node22",
   outDir: "dist",

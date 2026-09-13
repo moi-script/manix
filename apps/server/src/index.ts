@@ -1,14 +1,11 @@
 import mongoose from "mongoose";
 import { createApp } from "./app";
 import { loadEnv } from "./config/env";
+import { loadDotEnvIfPresent } from "./config/load-dotenv";
 import { connectDb } from "./db/connect";
 import { MangaDexClient } from "./modules/sources/mangadex/client";
 
-try {
-  process.loadEnvFile(".env");
-} catch {
-  // No .env file: use the real environment (e.g. in production).
-}
+loadDotEnvIfPresent();
 
 const env = loadEnv();
 await connectDb(env.MONGODB_URI);
