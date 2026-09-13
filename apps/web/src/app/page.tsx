@@ -1,4 +1,5 @@
 import type { MangaDTO, Paginated } from "@manix/shared";
+import { ContinueReading } from "@/components/continue-reading";
 import { CoverShelf } from "@/components/cover-shelf";
 import { serverApi } from "@/lib/server-api";
 
@@ -31,6 +32,7 @@ export default async function HomePage() {
   return (
     <>
       <h1 className="sr-only">Manix</h1>
+      <ContinueReading />
       {popular && popular.length > 0 && (
         <CoverShelf
           title="Popular manhwa"
