@@ -1,11 +1,12 @@
 import request from "supertest";
 import { createApp, type AppDeps } from "../../src/app";
 import { testEnv } from "./env";
+import { fakeMangaDex } from "./fake-mangadex";
 
 export type TestApp = ReturnType<typeof createApp>;
 
 export function buildTestApp(deps: Partial<AppDeps> = {}): TestApp {
-  return createApp({ env: testEnv(), ...deps });
+  return createApp({ env: testEnv(), mangadex: fakeMangaDex().api, ...deps });
 }
 
 let userCounter = 0;
