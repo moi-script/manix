@@ -10,6 +10,9 @@ import type { AtHomeEntry, ChapterPagesService } from "../catalog/chapter-pages.
 import type { DiskCache } from "./disk-cache";
 
 const IMMUTABLE = "public, max-age=31536000, immutable";
+// Chapter pages must never be cached at a shared/CDN layer for as long as covers: if a
+// scanlation group gets blocked, its chapter images must stop being served promptly.
+const CHAPTER_PAGE_CACHE_CONTROL = "public, max-age=86400, s-maxage=3600";
 const UPSTREAM_TIMEOUT_MS = 20_000;
 const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
@@ -48,6 +51,10 @@ function nodeUrl(entry: AtHomeEntry, quality: ImageQuality, filename: string): s
   return `${entry.baseUrl}/${quality}/${entry.hash}/${filename}`;
 }
 
+function cacheControlFor(key: string): string {
+  return key.startsWith("ch/") ? CHAPTER_PAGE_CACHE_CONTROL : IMMUTABLE;
+}
+
 export class ImageService {
   private readonly now: () => number;
 
@@ -73,9 +80,14 @@ export class ImageService {
     let attempt = await this.fetchUpstream(nodeUrl(entry, quality, filename));
     if (!attempt.response.ok) {
       this.report(attempt, false, 0, false);
-      // The baseUrl may have expired; ask MangaDex for a fresh node once.
-      entry = await this.o.pages.getAtHome(chapterId, true);
-      attempt = await this.fetchUpstream(nodeUrl(entry, quality, filename));
+      // Only a rejected (403) or unreachable (synthetic 599) node justifies asking MangaDex
+      // for a fresh one; any other non-OK status is treated as a hard failure so that a pile
+      // of concurrently failing requests for the same node doesn't each force their own
+      // at-home refresh.
+      if (attempt.response.status === 403 || attempt.response.status === 599) {
+        entry = await this.o.pages.getAtHome(chapterId, entry.baseUrl);
+        attempt = await this.fetchUpstream(nodeUrl(entry, quality, filename));
+      }
     }
     if (!attempt.response.ok || !attempt.response.body) {
       this.report(attempt, false, 0, false);
@@ -105,7 +117,7 @@ export class ImageService {
   private async sendCached(res: ExpressResponse, key: string, filename: string): Promise<boolean> {
     const hit = await this.o.cache.get(key);
     if (!hit) return false;
-    res.setHeader("Cache-Control", IMMUTABLE);
+    res.setHeader("Cache-Control", cacheControlFor(key));
     res.setHeader("Content-Type", contentTypeFor(filename));
     res.setHeader("Content-Length", String(hit.size));
     res.setHeader("X-Manix-Cache", "HIT");
@@ -136,7 +148,7 @@ export class ImageService {
     const lengthHeader = upstream.headers.get("content-length");
     const expected = lengthHeader && !upstream.headers.get("content-encoding") ? Number(lengthHeader) : Number.NaN;
 
-    res.setHeader("Cache-Control", IMMUTABLE);
+    res.setHeader("Cache-Control", cacheControlFor(key));
     res.setHeader("Content-Type", contentTypeFor(filename));
     res.setHeader("X-Manix-Cache", "MISS");
     if (Number.isFinite(expected)) res.setHeader("Content-Length", String(expected));
@@ -179,7 +191,8 @@ export class ImageService {
 
   /** MangaDex@Home asks clients to report fetches from non-mangadex.org nodes. */
   private report(attempt: UpstreamAttempt, success: boolean, bytes: number, cached: boolean): void {
-    if (new URL(attempt.url).hostname.endsWith("mangadex.org")) return;
+    const hostname = new URL(attempt.url).hostname;
+    if (hostname === "mangadex.org" || hostname.endsWith(".mangadex.org")) return;
     const body = JSON.stringify({
       url: attempt.url,
       success,

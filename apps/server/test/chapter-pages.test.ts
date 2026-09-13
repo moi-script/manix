@@ -63,21 +63,43 @@ describe("GET /api/chapters/:id/pages", () => {
 });
 
 describe("ChapterPagesService", () => {
-  it("refetches when forced and after the TTL", async () => {
+  it("refetches when the failed baseUrl matches, not when it already changed, and after the TTL", async () => {
     let now = 0;
     const fake = fakeMangaDex({}, { [CH1]: atHome() });
+    fake.getAtHome
+      .mockResolvedValueOnce(atHome())
+      .mockResolvedValueOnce({ ...atHome(), baseUrl: "https://node-b.example" });
     const service = new ChapterPagesService(fake.api, () => now);
 
-    await service.getAtHome(CH1);
+    const entry = await service.getAtHome(CH1);
     await service.getAtHome(CH1);
     expect(fake.getAtHome).toHaveBeenCalledTimes(1);
 
-    await service.getAtHome(CH1, true);
+    // The failed baseUrl still matches the cached entry: refetch.
+    await service.getAtHome(CH1, entry.baseUrl);
     expect(fake.getAtHome).toHaveBeenCalledTimes(2);
+
+    // The failed baseUrl no longer matches the (now-refreshed) cached entry: someone else
+    // already refreshed it, so this returns the cached entry without another fetch.
+    const cached = await service.getAtHome(CH1, entry.baseUrl);
+    expect(fake.getAtHome).toHaveBeenCalledTimes(2);
+    expect(cached.baseUrl).not.toBe(entry.baseUrl);
 
     now = AT_HOME_TTL_MS + 1;
     await service.getAtHome(CH1);
     expect(fake.getAtHome).toHaveBeenCalledTimes(3);
+  });
+
+  it("shares one in-flight fetch across concurrent callers that need a refresh", async () => {
+    const fake = fakeMangaDex({}, { [CH1]: atHome() });
+    const service = new ChapterPagesService(fake.api);
+
+    const [a, b] = await Promise.all([
+      service.getAtHome(CH1, "https://stale.example"),
+      service.getAtHome(CH1, "https://stale.example"),
+    ]);
+    expect(fake.getAtHome).toHaveBeenCalledTimes(1);
+    expect(a).toEqual(b);
   });
 
   it("checks whether a file belongs to the chapter", async () => {

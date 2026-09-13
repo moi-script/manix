@@ -76,7 +76,7 @@ describe("image proxy", () => {
     const first = await getBinary(app, PAGE_URL);
     expect(first.status).toBe(200);
     expect(first.headers["content-type"]).toBe("image/png");
-    expect(first.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+    expect(first.headers["cache-control"]).toBe("public, max-age=86400, s-maxage=3600");
     expect(first.headers["x-manix-cache"]).toBe("MISS");
     expect(Buffer.compare(first.body as Buffer, Buffer.from(PNG))).toBe(0);
 
@@ -101,12 +101,13 @@ describe("image proxy", () => {
     const second = await getBinary(app, PAGE_URL);
     expect(second.status).toBe(200);
     expect(second.headers["x-manix-cache"]).toBe("HIT");
+    expect(second.headers["cache-control"]).toBe("public, max-age=86400, s-maxage=3600");
     expect(Buffer.compare(second.body as Buffer, Buffer.from(PNG))).toBe(0);
     expect(callsTo(`${NODE1}/data/${HASH}/1-aaa.png`)).toHaveLength(1);
     expect(fake.getAtHome).toHaveBeenCalledTimes(1);
   });
 
-  it("refreshes the at-home server once when a node rejects the request", async () => {
+  it("refreshes the at-home server once when a node rejects the request with 403", async () => {
     fake.getAtHome.mockResolvedValueOnce(atHome()).mockResolvedValueOnce({ ...atHome(), baseUrl: NODE2 });
     fetchImpl.mockImplementation(async (input: string | URL | Request) => {
       const url = String(input);
@@ -120,11 +121,14 @@ describe("image proxy", () => {
     expect(fake.getAtHome).toHaveBeenCalledTimes(2);
   });
 
-  it("returns 502 when the node keeps failing", async () => {
+  it("returns 502 without refreshing at-home when the node fails with a non-403/599 status", async () => {
     fetchImpl.mockImplementation(async () => new Response(null, { status: 500 }));
     const res = await request(app).get(PAGE_URL);
     expect(res.status).toBe(502);
     expect(res.body.error.code).toBe("image_unavailable");
+    // getAtHome was only called once, to resolve the node in the first place; the 500
+    // response must not trigger a second at-home lookup.
+    expect(fake.getAtHome).toHaveBeenCalledTimes(1);
   });
 
   it("returns 404 for files that are not part of the chapter", async () => {
@@ -224,11 +228,74 @@ describe("image proxy", () => {
     expect(hit).not.toBeNull();
   });
 
-  it("proxies covers from the uploads server without reporting", async () => {
+  it("proxies covers from the uploads server without reporting, and caches them immutably", async () => {
     const res = await getBinary(app, `/img/cover/${MANGA_ID}/${COVER_FILE}.512.jpg`);
     expect(res.status).toBe(200);
     expect(res.headers["content-type"]).toBe("image/jpeg");
+    expect(res.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
     expect((res.body as Buffer).toString()).toBe("cover");
     expect(callsTo(REPORT_URL)).toHaveLength(0);
+
+    const second = await getBinary(app, `/img/cover/${MANGA_ID}/${COVER_FILE}.512.jpg`);
+    expect(second.headers["cache-control"]).toBe("public, max-age=31536000, immutable");
+  });
+
+  it("blocks a chapter's images even after they were already cached on disk", async () => {
+    const first = await getBinary(app, PAGE_URL);
+    expect(first.status).toBe(200);
+    const cachePath = new DiskCache(dir, 1).pathFor(`ch/${CH1}/data/1-aaa.png`);
+    await vi.waitFor(() => fs.access(cachePath));
+
+    await BlockedGroup.create({ groupSourceId: GROUP_A, name: "Alpha Scans", reason: "removal request" });
+
+    const res = await request(app).get(PAGE_URL);
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe("chapter_unavailable");
+  });
+
+  it("fetches successfully from a mangadex.org-style upload node and does not report it", async () => {
+    const uploadNode = "https://cmdxd98sb0x3yprd.mangadex.org/token";
+    fake.getAtHome.mockResolvedValueOnce({ ...atHome(), baseUrl: uploadNode });
+    fetchImpl.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === `${uploadNode}/data/${HASH}/1-aaa.png`) {
+        return new Response(PNG, { status: 200, headers: { "content-type": "image/png" } });
+      }
+      return new Response(null, { status: 404 });
+    });
+
+    const res = await getBinary(app, PAGE_URL);
+    expect(res.status).toBe(200);
+    expect(Buffer.compare(res.body as Buffer, Buffer.from(PNG))).toBe(0);
+    expect(callsTo(REPORT_URL)).toHaveLength(0);
+  });
+
+  it("reports a failed first attempt with success: false", async () => {
+    fake.getAtHome.mockResolvedValueOnce(atHome()).mockResolvedValueOnce({ ...atHome(), baseUrl: NODE2 });
+    fetchImpl.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.startsWith(NODE1)) return new Response(null, { status: 403 });
+      if (url === `${NODE2}/data/${HASH}/1-aaa.png`) return new Response(PNG, { status: 200 });
+      return new Response(null, { status: 200 });
+    });
+
+    const res = await getBinary(app, PAGE_URL);
+    expect(res.status).toBe(200);
+
+    await vi.waitFor(() => expect(callsTo(REPORT_URL).length).toBeGreaterThanOrEqual(1));
+    const firstReport = JSON.parse(String((callsTo(REPORT_URL)[0][1] as RequestInit).body));
+    expect(firstReport).toMatchObject({ url: `${NODE1}/data/${HASH}/1-aaa.png`, success: false });
+  });
+
+  it("returns 404 image_not_found when the cover upstream 404s", async () => {
+    fetchImpl.mockImplementation(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === COVER_UPSTREAM) return new Response(null, { status: 404 });
+      return new Response(null, { status: 200 });
+    });
+
+    const res = await request(app).get(`/img/cover/${MANGA_ID}/${COVER_FILE}.512.jpg`);
+    expect(res.status).toBe(404);
+    expect(res.body.error.code).toBe("image_not_found");
   });
 });

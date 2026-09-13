@@ -21,16 +21,43 @@ function filesFor(entry: AtHomeEntry, quality: ImageQuality): string[] {
 
 export class ChapterPagesService {
   private readonly cache = new Map<string, AtHomeEntry>();
+  /** In-flight fetches, keyed by chapter id, so concurrent callers share one request. */
+  private readonly inFlight = new Map<string, Promise<AtHomeEntry>>();
 
   constructor(
     private readonly md: MangaDexApi,
     private readonly now: () => number = () => Date.now(),
   ) {}
 
-  async getAtHome(chapterId: string, forceRefresh = false): Promise<AtHomeEntry> {
+  /**
+   * Returns the cached at-home entry for `chapterId`, fetching (or refetching) as needed.
+   *
+   * `failedBaseUrl` signals that a caller just failed to fetch an image from that baseUrl:
+   * - If the cached entry's baseUrl still equals `failedBaseUrl`, refetch (that node is bad).
+   * - If it already differs, another caller already refreshed it, so the cached entry is
+   *   returned as-is instead of triggering another refresh.
+   * Without `failedBaseUrl`, normal TTL behavior applies.
+   */
+  async getAtHome(chapterId: string, failedBaseUrl?: string): Promise<AtHomeEntry> {
     const hit = this.cache.get(chapterId);
-    if (hit && !forceRefresh && this.now() - hit.fetchedAt < AT_HOME_TTL_MS) return hit;
+    const needsRefresh = failedBaseUrl !== undefined
+      ? hit === undefined || hit.baseUrl === failedBaseUrl
+      : hit === undefined || this.now() - hit.fetchedAt >= AT_HOME_TTL_MS;
+    if (!needsRefresh) return hit as AtHomeEntry;
 
+    const existing = this.inFlight.get(chapterId);
+    if (existing) return existing;
+
+    const fetchPromise = this.fetchAndCache(chapterId);
+    this.inFlight.set(chapterId, fetchPromise);
+    try {
+      return await fetchPromise;
+    } finally {
+      this.inFlight.delete(chapterId);
+    }
+  }
+
+  private async fetchAndCache(chapterId: string): Promise<AtHomeEntry> {
     let res: MdAtHomeResponse;
     try {
       res = await this.md.getAtHome<MdAtHomeResponse>(chapterId);
