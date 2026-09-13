@@ -86,6 +86,15 @@ export default async function TitlePage({ params }: { params: Params }) {
           )}
           {genres.length > 0 && <p className="mt-3 text-sm text-dusk">{genres.join(", ")}</p>}
 
+          <a
+            href={`https://mangadex.org/title/${manga.id}`}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-3 inline-block text-sm text-dusk underline"
+          >
+            View on MangaDex
+          </a>
+
           <ReadActions mangaId={manga.id} firstChapterId={firstReadable?.id ?? null} />
 
           {description && (
