@@ -82,4 +82,37 @@ describe("ReadActions", () => {
     );
     expect(await screen.findByText("Saved")).toBeInTheDocument();
   });
+
+  it("disables the library select while a save is in flight", async () => {
+    authState.user = sampleUser;
+    let resolvePut!: (value: Response) => void;
+    const putDeferred = new Promise<Response>((resolve) => {
+      resolvePut = resolve;
+    });
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url === `/api/progress/${MANGA_ID}`) return jsonResponse({ progress: null });
+      if (url === `/api/library/${MANGA_ID}` && (init?.method ?? "GET") === "GET") return jsonResponse({ entry: null });
+      if (url === `/api/library/${MANGA_ID}` && init?.method === "PUT") return putDeferred;
+      return jsonResponse({ error: { code: "not_found", message: "x" } }, 404);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const user = userEvent.setup();
+
+    render(<ReadActions mangaId={MANGA_ID} firstChapterId={CH1} />);
+    await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const select = screen.getByRole("combobox", { name: "Library" });
+    await user.selectOptions(select, "plan");
+
+    await waitFor(() => expect(select).toBeDisabled());
+
+    resolvePut(
+      jsonResponse({ entry: { mangaId: MANGA_ID, status: "plan", updatedAt: "2024-01-05T00:00:00.000Z", manga: null } }),
+    );
+
+    await waitFor(() => expect(select).not.toBeDisabled());
+    expect(await screen.findByText("Saved")).toBeInTheDocument();
+  });
 });

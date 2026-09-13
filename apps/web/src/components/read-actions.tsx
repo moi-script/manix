@@ -86,6 +86,7 @@ export function ReadActions({ mangaId, firstChapterId }: { mangaId: string; firs
             id="library-status"
             value={status}
             onChange={(event) => void changeStatus(event.target.value as ReadingStatus | "")}
+            disabled={saveState === "saving"}
             className="rounded-sm border border-rule bg-gutter px-3 py-2 text-paper"
           >
             {STATUS_OPTIONS.map((option) => (
