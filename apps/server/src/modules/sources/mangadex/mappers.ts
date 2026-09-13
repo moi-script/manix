@@ -52,8 +52,12 @@ function relationshipNames(relationships: MdRelationship[], type: string): strin
 
 export function mapManga(raw: MdManga): MangaRecord {
   const a = raw.attributes;
-  const title = pickLocalized(a.title) || "Untitled";
-  const altTitles = [...new Set(a.altTitles.flatMap((t) => Object.values(t)))].filter((t) => t !== title);
+  const originalTitleValues = Object.values(a.title ?? {});
+  const altTitleWithEnglish = a.altTitles.find((t) => typeof t.en === "string" && t.en);
+  const title = a.title?.en || altTitleWithEnglish?.en || pickLocalized(a.title) || "Untitled";
+  const altTitles = [...new Set([...originalTitleValues, ...a.altTitles.flatMap((t) => Object.values(t))])].filter(
+    (t) => t !== title,
+  );
   const cover = raw.relationships.find((r) => r.type === "cover_art");
   const coverFile = typeof cover?.attributes?.fileName === "string" ? cover.attributes.fileName : null;
 

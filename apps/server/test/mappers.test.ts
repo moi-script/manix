@@ -38,10 +38,20 @@ describe("mapManga", () => {
   it("falls back to Untitled and a null cover", () => {
     const raw = mangaEntity().data;
     raw.attributes.title = {};
+    raw.attributes.altTitles = [];
     raw.relationships = [];
     const record = mapManga(raw);
     expect(record.title).toBe("Untitled");
     expect(record.coverFile).toBeNull();
+  });
+
+  it("prefers an English altTitles entry over the romanized original title", () => {
+    const raw = mangaEntity().data;
+    raw.attributes.title = { "ko-ro": "Na Honjaman Rebeleop" };
+    raw.attributes.altTitles = [{ en: "Solo Leveling" }, { ko: "나 혼자만 레벨업" }];
+    const record = mapManga(raw);
+    expect(record.title).toBe("Solo Leveling");
+    expect(record.altTitles[0]).toBe("Na Honjaman Rebeleop");
   });
 });
 
