@@ -11,6 +11,21 @@ describe("safeNext", () => {
     expect(safeNext("/\\evil.example")).toBe("/");
     expect(safeNext(null, "/search")).toBe("/search");
   });
+
+  it("never resolves to an off-site origin, even via control characters", () => {
+    const inputs = [
+      "/\t/evil.example",
+      "/\n/evil.example",
+      "/%09/evil.example",
+      "//evil.example",
+      "/\\evil.example",
+      "https://evil.example",
+    ];
+    for (const input of inputs) {
+      const result = safeNext(input);
+      expect(new URL(result, "https://manix.test").origin).toBe("https://manix.test");
+    }
+  });
 });
 
 describe("friendlyAuthError", () => {
