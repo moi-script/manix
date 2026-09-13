@@ -7,6 +7,7 @@ import { authenticate } from "./modules/auth/auth.middleware";
 import { authRouter } from "./modules/auth/auth.routes";
 import { catalogRouter } from "./modules/catalog/catalog.routes";
 import { CatalogService } from "./modules/catalog/catalog.service";
+import { ChapterPagesService } from "./modules/catalog/chapter-pages.service";
 import type { MangaDexApi } from "./modules/sources/mangadex/client";
 
 export interface AppDeps {
@@ -16,6 +17,7 @@ export interface AppDeps {
 
 export function createApp({ env, mangadex }: AppDeps) {
   const catalog = new CatalogService(mangadex);
+  const pages = new ChapterPagesService(mangadex);
 
   const app = express();
   app.disable("x-powered-by");
@@ -29,7 +31,7 @@ export function createApp({ env, mangadex }: AppDeps) {
     res.json({ ok: true, sourceAvailable: mangadex.isAvailable() });
   });
   app.use("/api/auth", authRouter(env));
-  app.use("/api", catalogRouter({ env, catalog }));
+  app.use("/api", catalogRouter({ env, catalog, pages }));
 
   app.use(notFound);
   app.use(errorHandler);
