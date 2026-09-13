@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { AuthProvider } from "@/components/auth-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { SourceBanner } from "@/components/source-banner";
 import "./globals.css";
 
 const display = Black_Han_Sans({
@@ -31,6 +32,7 @@ export default function RootLayout({ children }: { children: ReactNode }) {
       <body className="flex min-h-dvh flex-col">
         <AuthProvider>
           <SiteHeader />
+          <SourceBanner />
           <main className="flex-1">{children}</main>
           <SiteFooter />
         </AuthProvider>
