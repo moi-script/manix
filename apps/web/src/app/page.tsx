@@ -2,8 +2,6 @@ import type { MangaDTO, Paginated } from "@manix/shared";
 import { CoverShelf } from "@/components/cover-shelf";
 import { serverApi } from "@/lib/server-api";
 
-export const dynamic = "force-dynamic";
-
 async function loadShelf(query: string): Promise<MangaDTO[] | null> {
   try {
     const result = await serverApi<Paginated<MangaDTO>>(`/api/manga?${query}`, { revalidate: 300 });

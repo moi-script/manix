@@ -8,8 +8,6 @@ import { serverApi } from "@/lib/server-api";
 
 export const metadata: Metadata = { title: "Browse manhwa" };
 
-export const dynamic = "force-dynamic";
-
 type SearchParams = Promise<Record<string, string | string[] | undefined>>;
 
 export default async function SearchPage({ searchParams }: { searchParams: SearchParams }) {
