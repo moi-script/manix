@@ -147,6 +147,20 @@ export class ImageService {
     source.on("data", (chunk: Buffer) => {
       bytes += chunk.length;
     });
+    // A client disconnect must not crash the process, and must not abort the cache
+    // write. Writing to a destroyed response can emit 'error' with no listener, which
+    // is fatal by default, so swallow it. That alone is not enough, though: once `res`
+    // is destroyed every further write to it returns false (backpressure) and it will
+    // never emit 'drain', so pipe()'s flow control would otherwise pause `source`
+    // forever and stall the parallel write into `writer.stream` too. Unpipe `res` on
+    // close (and resume `source`, since unpiping alone leaves it paused) so the cache
+    // write keeps flowing and still gets committed once the upstream finishes,
+    // independent of whether the client is still there.
+    res.on("error", () => undefined);
+    res.once("close", () => {
+      source.unpipe(res);
+      source.resume();
+    });
     source.pipe(res);
 
     try {

@@ -1,10 +1,12 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { PassThrough } from "node:stream";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 import { Chapter } from "../src/modules/catalog/chapter.model";
 import { DiskCache } from "../src/modules/images/disk-cache";
+import { ImageService } from "../src/modules/images/image.service";
 import { BlockedGroup } from "../src/modules/moderation/blocked-group.model";
 import { buildTestApp, type TestApp } from "./helpers/app";
 import { clearTestDb, startTestDb, stopTestDb } from "./helpers/db";
@@ -142,6 +144,84 @@ describe("image proxy", () => {
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe("chapter_unavailable");
     expect(callsTo(`${NODE1}/data/${HASH}/1-aaa.png`)).toHaveLength(0);
+  });
+
+  // A real end-to-end "client disconnects mid-download" reproduction (real TCP socket
+  // via app.listen(0), req.destroy() on first byte) was attempted here first, but proved
+  // non-deterministic on Windows: `req.destroy()` did not reliably surface as a write
+  // error on the Express `res` before the upstream stream finished, so the assertion
+  // passed the same whether or not the fix in image.service.ts was present. Per the
+  // fallback guidance, this is a focused unit test instead: it drives `ImageService`
+  // directly with a fake `res` (a real Writable) and forces an 'error' event on it
+  // mid-stream, deterministically reproducing what a client disconnect looks like from
+  // the service's point of view.
+  it("does not crash when the response stream errors mid-download (client disconnect)", async () => {
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const slowBody = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+        c.enqueue(PNG.slice(0, 4));
+      },
+    });
+    const upstreamFetch = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url === `${NODE1}/data/${HASH}/1-aaa.png`) {
+        return new Response(slowBody, { status: 200, headers: { "content-type": "image/png" } });
+      }
+      return new Response(null, { status: 200 });
+    });
+
+    const cache = new DiskCache(dir, 1024 * 1024);
+    const images = new ImageService({
+      cache,
+      pages: {
+        getAtHome: async () => ({ baseUrl: NODE1, hash: HASH, data: ["1-aaa.png"], dataSaver: [], fetchedAt: Date.now() }),
+        hasFile: () => true,
+      },
+      catalog: { assertReadable: async () => undefined },
+      fetchImpl: upstreamFetch as unknown as typeof fetch,
+      userAgent: "Manix-Test/0.0",
+      uploadsUrl: "https://uploads.mangadex.test",
+      reportUrl: REPORT_URL,
+    });
+
+    const res = new PassThrough() as PassThrough & { setHeader: (name: string, value: string) => void };
+    res.setHeader = () => undefined; // minimal Express Response duck-typing
+
+    let uncaught: unknown;
+    const onUncaught = (err: unknown) => {
+      uncaught = err;
+    };
+    process.once("uncaughtException", onUncaught);
+
+    const served = images.serveChapterImage(
+      res as unknown as import("express").Response,
+      CH1,
+      "data",
+      "1-aaa.png",
+    );
+
+    // Wait until the service has actually attached its stream listeners (real fs work
+    // in DiskCache.createWriter happens first) before simulating the client going away,
+    // so this doesn't race the service's own setup.
+    await vi.waitFor(() => {
+      if (res.listenerCount("close") === 0) throw new Error("not wired up yet");
+    });
+    res.destroy(new Error("simulated client disconnect"));
+
+    // Finish the upstream body; the cache write must still complete even though the
+    // client-facing stream errored out.
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    controller.enqueue(PNG.slice(4));
+    controller.close();
+
+    await served.catch(() => undefined);
+    await new Promise((resolve) => setImmediate(resolve));
+    process.removeListener("uncaughtException", onUncaught);
+
+    expect(uncaught).toBeUndefined();
+    const hit = await cache.get(`ch/${CH1}/data/1-aaa.png`);
+    expect(hit).not.toBeNull();
   });
 
   it("proxies covers from the uploads server without reporting", async () => {
