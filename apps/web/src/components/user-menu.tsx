@@ -13,7 +13,7 @@ export function UserMenu() {
   if (!user) {
     return (
       <div className="flex items-center gap-2 text-sm sm:gap-4">
-        <Link href="/login" className="whitespace-nowrap text-dusk hover:text-paper">
+        <Link href="/login" className="hidden whitespace-nowrap text-dusk hover:text-paper sm:inline">
           Log in
         </Link>
         <Link href="/register" className="whitespace-nowrap rounded-sm bg-marker px-3 py-1.5 font-medium text-ink">

@@ -9,7 +9,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 describe("SiteHeader", () => {
-  it("keeps nav links and the auth control on one line so nothing wraps at phone widths", async () => {
+  it("links to every destination, signed out", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ error: { code: "unauthorized", message: "Login required" } }, 401)));
     render(
       <AuthProvider>
@@ -17,11 +17,10 @@ describe("SiteHeader", () => {
       </AuthProvider>,
     );
 
-    for (const name of ["Browse", "Library", "History"]) {
-      expect(screen.getByRole("link", { name })).toHaveClass("whitespace-nowrap");
-    }
-
-    expect(await screen.findByRole("link", { name: "Log in" })).toHaveClass("whitespace-nowrap");
-    expect(screen.getByRole("link", { name: "Sign up" })).toHaveClass("whitespace-nowrap");
+    expect(screen.getByRole("link", { name: "Browse" })).toHaveAttribute("href", "/search");
+    expect(screen.getByRole("link", { name: "Library" })).toHaveAttribute("href", "/library");
+    expect(screen.getByRole("link", { name: "History" })).toHaveAttribute("href", "/history");
+    expect(await screen.findByRole("link", { name: "Log in" })).toHaveAttribute("href", "/login");
+    expect(screen.getByRole("link", { name: "Sign up" })).toHaveAttribute("href", "/register");
   });
 });

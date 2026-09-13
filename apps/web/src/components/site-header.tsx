@@ -15,7 +15,7 @@ export function SiteHeader() {
           <Link href="/library" className="whitespace-nowrap hover:text-paper">
             Library
           </Link>
-          <Link href="/history" className="whitespace-nowrap hover:text-paper">
+          <Link href="/history" className="hidden whitespace-nowrap hover:text-paper sm:inline">
             History
           </Link>
         </nav>
