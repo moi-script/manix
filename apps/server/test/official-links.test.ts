@@ -11,6 +11,8 @@ describe("siteName", () => {
     expect(siteName("https://www.tappytoon.com/en/book/x")).toBe("Tappytoon");
     expect(siteName("https://www.lezhinus.com/en/comic/x")).toBe("Lezhin");
     expect(siteName("https://manta.net/en/series/x")).toBe("Manta");
+    expect(siteName("https://yenpress.com/series/omniscient-reader-s-viewpoint")).toBe("Yen Press");
+    expect(siteName("https://www.webnovel.com/comic/x")).toBe("Webnovel");
   });
 
   it("falls back to the given name, then the bare hostname", () => {

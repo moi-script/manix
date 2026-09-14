@@ -26,6 +26,16 @@ describe("ReadActions", () => {
     );
   });
 
+  it("says where reading starts when chapter 1 isn't available", () => {
+    render(<ReadActions mangaId={MANGA_ID} firstChapterId={CH1} firstChapterNumber="207" />);
+    expect(screen.getByRole("link", { name: "Start at chapter 207" })).toHaveAttribute("href", `/read/${CH1}`);
+  });
+
+  it("keeps the plain label when reading starts at chapter 1", () => {
+    render(<ReadActions mangaId={MANGA_ID} firstChapterId={CH1} firstChapterNumber="1" />);
+    expect(screen.getByRole("link", { name: "Start reading" })).toBeInTheDocument();
+  });
+
   it("says so when there is nothing to read", () => {
     render(<ReadActions mangaId={MANGA_ID} firstChapterId={null} />);
     expect(screen.getByText("No chapters to read here yet")).toBeInTheDocument();

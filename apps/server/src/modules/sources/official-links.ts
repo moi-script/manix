@@ -13,6 +13,11 @@ const KNOWN_SITES: [host: string, name: string][] = [
   ["comikey.com", "Comikey"],
   ["inkr.com", "INKR"],
   ["globalcomix.com", "GlobalComix"],
+  ["yenpress.com", "Yen Press"],
+  ["webnovel.com", "Webnovel"],
+  ["webcomicsapp.com", "WebComics"],
+  ["viz.com", "VIZ"],
+  ["kodansha.us", "Kodansha"],
 ];
 
 function parseHttpUrl(url: string): URL | null {

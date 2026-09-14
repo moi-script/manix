@@ -54,6 +54,12 @@ export function findNeighbors(
   };
 }
 
+function rankReadableFirst(manga: MdManga[], language: string): MdManga[] {
+  const readable = (m: MdManga) =>
+    (m.attributes.availableTranslatedLanguages ?? []).includes(language) || Boolean(m.attributes.links?.engtl);
+  return [...manga.filter(readable), ...manga.filter((m) => !readable(m))];
+}
+
 export class CatalogService {
   /** Manga/chapter ids MangaDex recently returned 404/400 for, mapped to their expiry. */
   private readonly mangaMisses = new Map<string, number>();
@@ -131,7 +137,10 @@ export class CatalogService {
         hasAvailableChapters: params.q ? undefined : "true",
         [`order[${order}]`]: "desc",
       });
-      const records = res.data.map(mapManga);
+      // A title search no longer filters by language, so rank what can actually be read (here or
+      // officially) above novel editions and placeholder entries, keeping MangaDex's order otherwise.
+      const ranked = params.q ? rankReadableFirst(res.data, params.lang) : res.data;
+      const records = ranked.map(mapManga);
       await this.cacheManga(records);
       return {
         items: records.map(toMangaDTO),

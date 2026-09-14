@@ -16,7 +16,16 @@ const STATUS_OPTIONS: { value: ReadingStatus | ""; label: string }[] = [
 
 const SAVE_MESSAGES = { idle: "", saving: "Saving", saved: "Saved", error: "Couldn't save. Try again." } as const;
 
-export function ReadActions({ mangaId, firstChapterId }: { mangaId: string; firstChapterId: string | null }) {
+export function ReadActions({
+  mangaId,
+  firstChapterId,
+  firstChapterNumber = null,
+}: {
+  mangaId: string;
+  firstChapterId: string | null;
+  /** Number of the first readable chapter, so a series missing its opening chapters says where it starts. */
+  firstChapterNumber?: string | null;
+}) {
   const { user, loading } = useAuth();
   const [progress, setProgress] = useState<ProgressDTO | null>(null);
   const [status, setStatus] = useState<ReadingStatus | "">("");
@@ -69,7 +78,9 @@ export function ReadActions({ mangaId, firstChapterId }: { mangaId: string; firs
     ? progress.chapterNumber
       ? `Continue chapter ${progress.chapterNumber}`
       : "Continue reading"
-    : "Start reading";
+    : firstChapterNumber && Number.parseFloat(firstChapterNumber) >= 2
+      ? `Start at chapter ${firstChapterNumber}`
+      : "Start reading";
 
   return (
     <div className="mt-6 flex flex-wrap items-center gap-x-5 gap-y-3">

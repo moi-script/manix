@@ -97,7 +97,11 @@ export default async function TitlePage({ params }: { params: Params }) {
             View on MangaDex
           </a>
 
-          <ReadActions mangaId={manga.id} firstChapterId={firstReadable?.id ?? null} />
+          <ReadActions
+            mangaId={manga.id}
+            firstChapterId={firstReadable?.id ?? null}
+            firstChapterNumber={firstReadable?.number ?? null}
+          />
 
           {description && (
             <p className="mt-8 max-w-prose whitespace-pre-line leading-relaxed text-paper/90">{description}</p>
@@ -105,7 +109,7 @@ export default async function TitlePage({ params }: { params: Params }) {
 
           <OfficialLinks mangaId={manga.id} links={officialLinks} />
 
-          <ChapterList chapters={chapters} officialSite={officialLinks[0]?.site} />
+          <ChapterList chapters={chapters} official={officialLinks[0]} />
         </div>
       </div>
     </article>

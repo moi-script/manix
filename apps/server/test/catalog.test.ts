@@ -197,6 +197,33 @@ describe("catalog", () => {
     expect(query.hasAvailableChapters).toBeUndefined();
   });
 
+  it("ranks title search results readable in English or officially available above the rest", async () => {
+    const make = (id: string, attributes: Record<string, unknown>) => {
+      const entity = mangaEntity().data;
+      return { ...entity, id, attributes: { ...entity.attributes, title: { en: id }, ...attributes } };
+    };
+    fake.handlers["/manga"] = {
+      result: "ok",
+      data: [
+        make("novel", { availableTranslatedLanguages: ["ko"], links: {} }),
+        make("readable", { availableTranslatedLanguages: ["en", "ko"] }),
+        make("licensed", { availableTranslatedLanguages: [], links: { engtl: "https://www.webtoons.com/en/x" } }),
+        make("pre-serialization", { availableTranslatedLanguages: null }),
+      ],
+      limit: 24,
+      offset: 0,
+      total: 4,
+    };
+
+    const res = await request(app).get("/api/manga?q=solo");
+    expect(res.body.items.map((m: { title: string }) => m.title)).toEqual([
+      "readable",
+      "licensed",
+      "novel",
+      "pre-serialization",
+    ]);
+  });
+
   it("still only browses titles with English chapters when there is no search text", async () => {
     fake.handlers["/manga"] = { result: "ok", data: [], limit: 24, offset: 0, total: 0 };
     await request(app).get("/api/manga");
