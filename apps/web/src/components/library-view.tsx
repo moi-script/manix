@@ -7,6 +7,7 @@ import { useAuth } from "@/components/auth-provider";
 import { MangaCard } from "@/components/manga-card";
 import { SignedOutPrompt } from "@/components/signed-out-prompt";
 import { api } from "@/lib/api";
+import { officialLinksOf } from "@/lib/format";
 
 type Tab = ReadingStatus | "all";
 
@@ -102,14 +103,14 @@ export function LibraryView() {
               {entry.manga ? (
                 <>
                   <MangaCard manga={entry.manga} />
-                  {entry.officialEpisode !== null && entry.manga.officialLinks[0] && (
+                  {entry.officialEpisode != null && officialLinksOf(entry.manga)[0] && (
                     <a
-                      href={entry.manga.officialLinks[0].url}
+                      href={officialLinksOf(entry.manga)[0].url}
                       target="_blank"
                       rel="noreferrer"
                       className="mt-1 block text-xs text-marker hover:underline"
                     >
-                      Episode {entry.officialEpisode} · {entry.manga.officialLinks[0].site} <span aria-hidden>↗</span>
+                      Episode {entry.officialEpisode} · {officialLinksOf(entry.manga)[0].site} <span aria-hidden>↗</span>
                     </a>
                   )}
                 </>

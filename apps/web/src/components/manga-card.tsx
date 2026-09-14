@@ -1,6 +1,6 @@
 import type { MangaDTO } from "@manix/shared";
 import Link from "next/link";
-import { statusLabel } from "@/lib/format";
+import { officialLinksOf, statusLabel } from "@/lib/format";
 
 export function MangaCard({ manga, priority = false }: { manga: MangaDTO; priority?: boolean }) {
   const meta = [statusLabel(manga.status), manga.year ? String(manga.year) : ""].filter(Boolean).join(", ");
@@ -22,7 +22,7 @@ export function MangaCard({ manga, priority = false }: { manga: MangaDTO; priori
             {manga.title.charAt(0)}
           </span>
         )}
-        {manga.officialLinks.length > 0 && (
+        {officialLinksOf(manga).length > 0 && (
           <span className="absolute left-1.5 top-1.5 rounded-sm bg-ink/85 px-1.5 py-0.5 text-[0.65rem] font-medium text-marker">
             Official EN
           </span>

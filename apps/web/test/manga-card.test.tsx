@@ -17,6 +17,13 @@ describe("MangaCard", () => {
     expect(screen.getByText("Official EN")).toBeInTheDocument();
   });
 
+  it("still renders when an older API omits officialLinks", () => {
+    const { officialLinks: _omitted, ...older } = sampleManga;
+    render(<MangaCard manga={older as typeof sampleManga} />);
+    expect(screen.getByRole("link", { name: /Solo Leveling/ })).toBeInTheDocument();
+    expect(screen.queryByText("Official EN")).toBeNull();
+  });
+
   it("has no badge without an official release", () => {
     render(<MangaCard manga={sampleManga} />);
     expect(screen.queryByText("Official EN")).toBeNull();

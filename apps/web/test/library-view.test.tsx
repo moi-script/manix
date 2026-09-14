@@ -60,6 +60,18 @@ describe("LibraryView", () => {
     expect(link).toHaveAttribute("target", "_blank");
   });
 
+  it("still lists titles when an older API omits the official fields", async () => {
+    authState.user = sampleUser;
+    const { officialLinks: _omitted, ...manga } = sampleManga;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ entries: [{ mangaId: MANGA_ID, status: "reading", updatedAt: "2024-01-05T00:00:00.000Z", manga }] })),
+    );
+    render(<LibraryView />);
+    expect(await screen.findByRole("link", { name: /Solo Leveling/ })).toBeInTheDocument();
+    expect(screen.queryByText(/Episode/)).toBeNull();
+  });
+
   it("invites browsing when nothing is saved", async () => {
     authState.user = sampleUser;
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ entries: [] })));

@@ -1,4 +1,4 @@
-import type { ChapterDTO, GroupDTO } from "@manix/shared";
+import type { ChapterDTO, GroupDTO, MangaDTO, OfficialLinkDTO } from "@manix/shared";
 
 const STATUS_LABELS: Record<string, string> = {
   ongoing: "Ongoing",
@@ -41,4 +41,9 @@ export function formatDate(iso: string): string {
     day: "numeric",
     timeZone: "UTC",
   });
+}
+
+/** An API deployed before official links existed omits the field, so treat it as optional. */
+export function officialLinksOf(manga: Pick<MangaDTO, "officialLinks">): OfficialLinkDTO[] {
+  return Array.isArray(manga.officialLinks) ? manga.officialLinks : [];
 }

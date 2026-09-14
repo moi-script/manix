@@ -6,7 +6,7 @@ import { ChapterList } from "@/components/chapter-list";
 import { OfficialLinks } from "@/components/official-links";
 import { ReadActions } from "@/components/read-actions";
 import { ApiError } from "@/lib/api";
-import { plainDescription, statusLabel } from "@/lib/format";
+import { officialLinksOf, plainDescription, statusLabel } from "@/lib/format";
 import { serverApi } from "@/lib/server-api";
 
 type Params = Promise<{ id: string }>;
@@ -58,6 +58,7 @@ export default async function TitlePage({ params }: { params: Params }) {
   const genres = manga.tags.filter((t) => t.group === "genre" || t.group === "theme").map((t) => t.name);
   const description = plainDescription(manga.description);
   const firstReadable = chapters.find((c) => !c.externalUrl) ?? null;
+  const officialLinks = officialLinksOf(manga);
 
   return (
     <article className="mx-auto max-w-6xl px-4 py-8">
@@ -102,9 +103,9 @@ export default async function TitlePage({ params }: { params: Params }) {
             <p className="mt-8 max-w-prose whitespace-pre-line leading-relaxed text-paper/90">{description}</p>
           )}
 
-          <OfficialLinks mangaId={manga.id} links={manga.officialLinks} />
+          <OfficialLinks mangaId={manga.id} links={officialLinks} />
 
-          <ChapterList chapters={chapters} officialSite={manga.officialLinks[0]?.site} />
+          <ChapterList chapters={chapters} officialSite={officialLinks[0]?.site} />
         </div>
       </div>
     </article>
