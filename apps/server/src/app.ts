@@ -1,3 +1,4 @@
+import type { ImageQuality } from "@manix/shared";
 import cookieParser from "cookie-parser";
 import express from "express";
 import rateLimit from "express-rate-limit";
@@ -72,7 +73,11 @@ export function createApp({ env, mangadex, fetchImpl = fetch }: AppDeps) {
     res.json({ ok: true, sourceAvailable: mangadex.isAvailable() });
   });
   app.use("/api/auth", authRouter(env));
-  app.use("/api", catalogRouter({ env, catalog, pages }));
+  const warmPages =
+    env.IMAGE_WARM_PAGES > 0
+      ? (chapterId: string, quality: ImageQuality) => void images.warmChapter(chapterId, quality, env.IMAGE_WARM_PAGES)
+      : undefined;
+  app.use("/api", catalogRouter({ env, catalog, pages, warmPages }));
   app.use("/api", libraryRouter(library));
   app.use("/img", imagesRouter(images));
 

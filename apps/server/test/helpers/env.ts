@@ -11,6 +11,7 @@ export function testEnv(overrides: Record<string, string> = {}): Env {
     APP_USER_AGENT: "Manix-Test/0.0",
     BCRYPT_COST: "4",
     IMAGE_CACHE_DIR: path.join(os.tmpdir(), "manix-test-images"),
+    IMAGE_WARM_PAGES: "0",
     MANGADEX_API_URL: "https://api.mangadex.test",
     MANGADEX_UPLOADS_URL: "https://uploads.mangadex.test",
     MANGADEX_REPORT_URL: "https://report.mangadex.test/report",

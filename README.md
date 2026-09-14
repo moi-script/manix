@@ -68,3 +68,5 @@ npm run dev                                     # API on :4000 and web on :3000
   `/img/ch/*` for its chapters from the CDN, or wait up to an hour for shared caches to expire it
   on their own.
 - `IMAGE_CACHE_DIR` should be on persistent disk.
+- On a host that sleeps idle services (Render's free plan), `.github/workflows/keep-alive.yml` pings
+  `/api/health` every 10 minutes. Update the URL in it if the site moves.

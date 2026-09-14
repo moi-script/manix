@@ -22,6 +22,9 @@ const EnvSchema = z.object({
   APP_USER_AGENT: z.string().min(3),
   IMAGE_CACHE_DIR: z.string().min(1).default(".cache/images"),
   IMAGE_CACHE_MAX_GB: z.coerce.number().positive().default(10),
+  // How many of a chapter's first pages to download into the cache as soon as its page list
+  // is requested, so they are ready before the reader asks. 0 turns warming off.
+  IMAGE_WARM_PAGES: z.coerce.number().int().min(0).max(20).default(6),
   MANGADEX_API_URL: z.string().url().default("https://api.mangadex.org"),
   MANGADEX_UPLOADS_URL: z.string().url().default("https://uploads.mangadex.org"),
   MANGADEX_REPORT_URL: z.string().url().default("https://api.mangadex.network/report"),

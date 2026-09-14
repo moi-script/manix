@@ -1,3 +1,4 @@
+import type { ImageQuality } from "@manix/shared";
 import { Router } from "express";
 import rateLimit from "express-rate-limit";
 import type { Env } from "../../config/env";
@@ -10,9 +11,11 @@ export interface CatalogRouterDeps {
   env: Env;
   catalog: CatalogService;
   pages: ChapterPagesService;
+  /** Starts caching a chapter's first pages in the background; must not throw. */
+  warmPages?: (chapterId: string, quality: ImageQuality) => void;
 }
 
-export function catalogRouter({ env, catalog, pages }: CatalogRouterDeps): Router {
+export function catalogRouter({ env, catalog, pages, warmPages }: CatalogRouterDeps): Router {
   const router = Router();
 
   // Each page-list request can cost one of our 36/min at-home calls, so cap it per client.
@@ -47,6 +50,7 @@ export function catalogRouter({ env, catalog, pages }: CatalogRouterDeps): Route
     const { quality } = pagesQuerySchema.parse(req.query);
     await catalog.assertReadable(id);
     res.json(await pages.getPages(id, quality));
+    warmPages?.(id, quality);
   });
 
   return router;

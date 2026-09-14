@@ -14,6 +14,8 @@ const IMMUTABLE = "public, max-age=31536000, immutable";
 // scanlation group gets blocked, its chapter images must stop being served promptly.
 const CHAPTER_PAGE_CACHE_CONTROL = "public, max-age=86400, s-maxage=3600";
 const UPSTREAM_TIMEOUT_MS = 20_000;
+/** Background warming stays gentle on the @Home node and on our own bandwidth. */
+const WARM_CONCURRENCY = 2;
 const CONTENT_TYPES: Record<string, string> = {
   ".jpg": "image/jpeg",
   ".jpeg": "image/jpeg",
@@ -51,15 +53,91 @@ function nodeUrl(entry: AtHomeEntry, quality: ImageQuality, filename: string): s
   return `${entry.baseUrl}/${quality}/${entry.hash}/${filename}`;
 }
 
+/** The byte count to expect, or NaN when the upstream length can't be trusted. */
+function expectedLength(upstream: Response): number {
+  const lengthHeader = upstream.headers.get("content-length");
+  return lengthHeader && !upstream.headers.get("content-encoding") ? Number(lengthHeader) : Number.NaN;
+}
+
+function assertComplete(bytes: number, expected: number): void {
+  if (Number.isFinite(expected) && bytes !== expected) {
+    throw new Error(`Truncated upstream image: ${bytes}/${expected} bytes`);
+  }
+}
+
 function cacheControlFor(key: string): string {
   return key.startsWith("ch/") ? CHAPTER_PAGE_CACHE_CONTROL : IMMUTABLE;
 }
 
 export class ImageService {
   private readonly now: () => number;
+  /** Cache keys currently being warmed, so overlapping warm calls don't download twice. */
+  private readonly warming = new Set<string>();
 
   constructor(private readonly o: ImageServiceOptions) {
     this.now = o.now ?? (() => Date.now());
+  }
+
+  /**
+   * Downloads the first `count` pages of a chapter into the disk cache, two at a time.
+   * Callers must already have checked the chapter is readable. Best effort: never rejects.
+   */
+  async warmChapter(chapterId: string, quality: ImageQuality, count: number): Promise<void> {
+    try {
+      const entry = await this.o.pages.getAtHome(chapterId);
+      const files = (quality === "data" ? entry.data : entry.dataSaver).slice(0, count);
+      let next = 0;
+      const worker = async () => {
+        while (next < files.length) {
+          const filename = files[next++];
+          await this.warmPage(entry, chapterId, quality, filename).catch(() => undefined);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(WARM_CONCURRENCY, files.length) }, worker));
+    } catch {
+      // Warming is an optimisation; the reader's own requests still fetch on demand.
+    }
+  }
+
+  private async warmPage(entry: AtHomeEntry, chapterId: string, quality: ImageQuality, filename: string) {
+    const key = `ch/${chapterId}/${quality}/${filename}`;
+    if (this.warming.has(key) || (await this.o.cache.get(key))) return;
+    this.warming.add(key);
+    try {
+      const attempt = await this.fetchUpstream(nodeUrl(entry, quality, filename));
+      if (!attempt.response.ok || !attempt.response.body) {
+        this.report(attempt, false, 0, false);
+        return;
+      }
+      const nodeCached = attempt.response.headers.get("x-cache")?.startsWith("HIT") ?? false;
+      try {
+        const bytes = await this.writeToCache(attempt.response, key);
+        this.report(attempt, true, bytes, nodeCached);
+      } catch {
+        this.report(attempt, false, 0, nodeCached);
+      }
+    } finally {
+      this.warming.delete(key);
+    }
+  }
+
+  private async writeToCache(upstream: Response, key: string): Promise<number> {
+    const expected = expectedLength(upstream);
+    const source = Readable.fromWeb(upstream.body as unknown as NodeWebReadableStream<Uint8Array>);
+    const writer = await this.o.cache.createWriter(key);
+    let bytes = 0;
+    source.on("data", (chunk: Buffer) => {
+      bytes += chunk.length;
+    });
+    try {
+      await pipeline(source, writer.stream);
+      assertComplete(bytes, expected);
+      await writer.commit();
+      return bytes;
+    } catch (err) {
+      await writer.abort();
+      throw err;
+    }
   }
 
   async serveChapterImage(
@@ -145,8 +223,7 @@ export class ImageService {
     key: string,
     filename: string,
   ): Promise<number> {
-    const lengthHeader = upstream.headers.get("content-length");
-    const expected = lengthHeader && !upstream.headers.get("content-encoding") ? Number(lengthHeader) : Number.NaN;
+    const expected = expectedLength(upstream);
 
     res.setHeader("Cache-Control", cacheControlFor(key));
     res.setHeader("Content-Type", contentTypeFor(filename));
@@ -177,9 +254,7 @@ export class ImageService {
 
     try {
       await pipeline(source, writer.stream);
-      if (Number.isFinite(expected) && bytes !== expected) {
-        throw new Error(`Truncated upstream image: ${bytes}/${expected} bytes`);
-      }
+      assertComplete(bytes, expected);
       await writer.commit();
       return bytes;
     } catch (err) {

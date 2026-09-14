@@ -298,4 +298,81 @@ describe("image proxy", () => {
     expect(res.status).toBe(404);
     expect(res.body.error.code).toBe("image_not_found");
   });
+
+  describe("warming a chapter", () => {
+    const FILES = ["1-aaa.png", "2-bbb.png", "3-ccc.png", "4-ddd.png", "5-eee.png"];
+    const nodeUrl = (file: string) => `${NODE1}/data/${HASH}/${file}`;
+    const cached = (file: string) => new DiskCache(dir, 1).pathFor(`ch/${CH1}/data/${file}`);
+
+    function warmService(upstream: Mock) {
+      return new ImageService({
+        cache: new DiskCache(dir, 1024 * 1024),
+        pages: {
+          getAtHome: async () => ({ baseUrl: NODE1, hash: HASH, data: FILES, dataSaver: [], fetchedAt: Date.now() }),
+          hasFile: () => true,
+        },
+        catalog: { assertReadable: async () => undefined },
+        fetchImpl: upstream as unknown as typeof fetch,
+        userAgent: "Manix-Test/0.0",
+        uploadsUrl: "https://uploads.mangadex.test",
+        reportUrl: REPORT_URL,
+      });
+    }
+
+    it("downloads the first pages into the disk cache and skips pages already cached", async () => {
+      const upstream = vi.fn(async (input: string | URL | Request) =>
+        String(input) === REPORT_URL ? new Response(null, { status: 200 }) : new Response(PNG, { status: 200 }),
+      );
+      const images = warmService(upstream);
+
+      await images.warmChapter(CH1, "data", 3);
+      for (const file of FILES.slice(0, 3)) await expect(fs.access(cached(file))).resolves.toBeUndefined();
+      await expect(fs.access(cached(FILES[3]))).rejects.toThrow();
+
+      await images.warmChapter(CH1, "data", 3);
+      const nodeCalls = upstream.mock.calls.filter(([u]) => String(u) !== REPORT_URL);
+      expect(nodeCalls.map(([u]) => String(u))).toEqual(FILES.slice(0, 3).map(nodeUrl));
+    });
+
+    it("downloads at most two pages at a time", async () => {
+      let active = 0;
+      let peak = 0;
+      const upstream = vi.fn(async (input: string | URL | Request) => {
+        if (String(input) === REPORT_URL) return new Response(null, { status: 200 });
+        active += 1;
+        peak = Math.max(peak, active);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        active -= 1;
+        return new Response(PNG, { status: 200 });
+      });
+
+      await warmService(upstream).warmChapter(CH1, "data", 5);
+      expect(peak).toBe(2);
+    });
+
+    it("never rejects when the node fails", async () => {
+      const upstream = vi.fn(async () => new Response(null, { status: 500 }));
+      await expect(warmService(upstream).warmChapter(CH1, "data", 2)).resolves.toBeUndefined();
+      await expect(fs.access(cached(FILES[0]))).rejects.toThrow();
+    });
+
+    it("is triggered by the page list endpoint when IMAGE_WARM_PAGES is set", async () => {
+      const warmApp = buildTestApp({
+        env: testEnv({ IMAGE_CACHE_DIR: dir, IMAGE_WARM_PAGES: "1" }),
+        mangadex: fake.api,
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+      });
+
+      const res = await request(warmApp).get(`/api/chapters/${CH1}/pages`);
+      expect(res.status).toBe(200);
+      await vi.waitFor(() => fs.access(cached("1-aaa.png")));
+      expect(callsTo(nodeUrl("2-bbb.png"))).toHaveLength(0);
+    });
+
+    it("is off in the default test environment", async () => {
+      await request(app).get(`/api/chapters/${CH1}/pages`);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(callsTo(nodeUrl("1-aaa.png"))).toHaveLength(0);
+    });
+  });
 });
