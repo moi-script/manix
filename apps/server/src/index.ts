@@ -13,8 +13,9 @@ await connectDb(env.MONGODB_URI);
 const mangadex = new MangaDexClient({ baseUrl: env.MANGADEX_API_URL, userAgent: env.APP_USER_AGENT });
 const app = createApp({ env, mangadex });
 
-const server = app.listen(env.PORT, () => {
-  console.log(`Manix server listening on http://localhost:${env.PORT}`);
+// Bind all IPv4 interfaces explicitly; hosts like Render route to 0.0.0.0.
+const server = app.listen(env.PORT, "0.0.0.0", () => {
+  console.log(`Manix server listening on http://0.0.0.0:${env.PORT}`);
 });
 
 function shutdown(signal: string): void {
