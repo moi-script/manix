@@ -22,6 +22,11 @@ describe("ChapterList", () => {
     expect(external).toHaveTextContent("Read on the publisher's site");
   });
 
+  it("points to the official release when there are no English chapters", () => {
+    render(<ChapterList chapters={[]} officialSite="WEBTOON" />);
+    expect(screen.getByText("No English chapters are on MangaDex. Read it officially on WEBTOON above.")).toBeInTheDocument();
+  });
+
   it("explains when there are no English chapters", () => {
     render(<ChapterList chapters={[]} />);
     expect(screen.getByText("No English chapters are on MangaDex for this title yet.")).toBeInTheDocument();

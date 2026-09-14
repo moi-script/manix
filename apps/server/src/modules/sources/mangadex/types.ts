@@ -24,6 +24,8 @@ export interface MdManga {
     year: number | null;
     contentRating: string;
     tags: MdTag[];
+    /** Short keys to external sites: "al" is the AniList id, "engtl" the official English URL. */
+    links?: Record<string, string> | null;
     updatedAt: string;
   };
   relationships: MdRelationship[];

@@ -28,6 +28,7 @@ const EnvSchema = z.object({
   MANGADEX_API_URL: z.string().url().default("https://api.mangadex.org"),
   MANGADEX_UPLOADS_URL: z.string().url().default("https://uploads.mangadex.org"),
   MANGADEX_REPORT_URL: z.string().url().default("https://api.mangadex.network/report"),
+  ANILIST_API_URL: z.string().url().default("https://graphql.anilist.co"),
   TRUST_PROXY: z.string().default("1").transform(parseTrustProxy),
   // Shared secret that lets the web app's server-side fetches skip the per-IP rate limiters,
   // since those fetches are made on behalf of many visitors but come from one trusted caller.

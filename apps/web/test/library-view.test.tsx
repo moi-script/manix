@@ -44,6 +44,22 @@ describe("LibraryView", () => {
     expect(screen.getByRole("button", { name: "Completed" })).toHaveAttribute("aria-pressed", "true");
   });
 
+  it("shows the episode reached on the official site", async () => {
+    authState.user = sampleUser;
+    const manga = { ...sampleManga, officialLinks: [{ site: "WEBTOON", url: "https://www.webtoons.com/en/x/list?title_no=1" }] };
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        jsonResponse({ entries: [{ mangaId: MANGA_ID, status: "reading", officialEpisode: 45, updatedAt: "2024-01-05T00:00:00.000Z", manga }] }),
+      ),
+    );
+    render(<LibraryView />);
+
+    const link = await screen.findByRole("link", { name: /Episode 45 · WEBTOON/ });
+    expect(link).toHaveAttribute("href", "https://www.webtoons.com/en/x/list?title_no=1");
+    expect(link).toHaveAttribute("target", "_blank");
+  });
+
   it("invites browsing when nothing is saved", async () => {
     authState.user = sampleUser;
     vi.stubGlobal("fetch", vi.fn(async () => jsonResponse({ entries: [] })));

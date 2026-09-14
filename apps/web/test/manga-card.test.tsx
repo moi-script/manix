@@ -12,6 +12,16 @@ describe("MangaCard", () => {
     expect(screen.getByText("Completed, 2018")).toBeInTheDocument();
   });
 
+  it("marks titles with an official English release", () => {
+    render(<MangaCard manga={{ ...sampleManga, officialLinks: [{ site: "WEBTOON", url: "https://www.webtoons.com/x" }] }} />);
+    expect(screen.getByText("Official EN")).toBeInTheDocument();
+  });
+
+  it("has no badge without an official release", () => {
+    render(<MangaCard manga={sampleManga} />);
+    expect(screen.queryByText("Official EN")).toBeNull();
+  });
+
   it("shows a lettered placeholder when there is no cover", () => {
     render(<MangaCard manga={{ ...sampleManga, id: "other", title: "Untitled Hunter", coverUrl: null, year: null }} />);
     const link = screen.getByRole("link", { name: /Untitled Hunter/ });

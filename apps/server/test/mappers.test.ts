@@ -32,7 +32,23 @@ describe("mapManga", () => {
       authors: ["Chugong"],
       artists: ["DUBU (REDICE STUDIO)"],
       sourceUpdatedAt: new Date("2024-05-01T10:00:00+00:00"),
+      mangadexLinks: [],
+      anilistId: null,
     });
+  });
+
+  it("keeps the official English link and the AniList id", () => {
+    const raw = mangaEntity().data;
+    raw.attributes.links = { al: "119257", engtl: "https://www.webtoons.com/en/action/x/list?title_no=2154" };
+    const record = mapManga(raw);
+    expect(record.mangadexLinks).toEqual([{ site: "WEBTOON", url: "https://www.webtoons.com/en/action/x/list?title_no=2154" }]);
+    expect(record.anilistId).toBe(119257);
+  });
+
+  it("ignores a malformed AniList id", () => {
+    const raw = mangaEntity().data;
+    raw.attributes.links = { al: "abc" };
+    expect(mapManga(raw).anilistId).toBeNull();
   });
 
   it("falls back to Untitled and a null cover", () => {

@@ -29,6 +29,7 @@ function toLibraryDTO(entry: LibraryAttrs, manga: MangaDTO | null): LibraryEntry
   return {
     mangaId: entry.mangaSourceId,
     status: entry.status,
+    officialEpisode: entry.officialEpisode ?? null,
     updatedAt: new Date(entry.updatedAt).toISOString(),
     manga,
   };
@@ -72,6 +73,17 @@ export class LibraryService {
     const entry = (await LibraryEntry.findOneAndUpdate(
       { userId, mangaSourceId: mangaId },
       { $set: { status } },
+      { upsert: true, new: true },
+    ).lean()) as LibraryAttrs;
+    return toLibraryDTO(entry, manga);
+  }
+
+  /** Records the episode reached on the official site; a title not in the library is added as reading. */
+  async setOfficialEpisode(userId: string, mangaId: string, episode: number): Promise<LibraryEntryDTO> {
+    const manga = await this.catalog.getManga(mangaId);
+    const entry = (await LibraryEntry.findOneAndUpdate(
+      { userId, mangaSourceId: mangaId },
+      { $set: { officialEpisode: episode }, $setOnInsert: { status: "reading" } },
       { upsert: true, new: true },
     ).lean()) as LibraryAttrs;
     return toLibraryDTO(entry, manga);

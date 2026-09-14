@@ -1,11 +1,13 @@
 import type { ChapterDTO, MangaDTO } from "@manix/shared";
 import type { ChapterRecord, MangaRecord } from "../sources/mangadex/mappers";
+import { mergeLinks } from "../sources/official-links";
+import type { AniListEnrichment } from "./manga.model";
 
 export function coverUrl(manga: Pick<MangaRecord, "sourceId" | "coverFile">): string | null {
   return manga.coverFile ? `/img/cover/${manga.sourceId}/${manga.coverFile}.512.jpg` : null;
 }
 
-export function toMangaDTO(manga: MangaRecord): MangaDTO {
+export function toMangaDTO(manga: MangaRecord & AniListEnrichment): MangaDTO {
   return {
     id: manga.sourceId,
     source: manga.source,
@@ -21,6 +23,8 @@ export function toMangaDTO(manga: MangaRecord): MangaDTO {
     authors: [...manga.authors],
     artists: [...manga.artists],
     sourceUpdatedAt: manga.sourceUpdatedAt ? new Date(manga.sourceUpdatedAt).toISOString() : null,
+    // Records cached before these fields existed have neither list.
+    officialLinks: mergeLinks(manga.mangadexLinks ?? [], manga.anilistLinks ?? []),
   };
 }
 

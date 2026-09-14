@@ -1,5 +1,6 @@
 import type { ChapterDetailDTO, ChapterDTO, MangaDTO, Paginated } from "@manix/shared";
 import { HttpError } from "../../lib/errors";
+import type { AniListApi } from "../sources/anilist/client";
 import { BlockedGroup } from "../moderation/blocked-group.model";
 import { MangaDexError, type MangaDexApi } from "../sources/mangadex/client";
 import { mapChapter, mapManga, type ChapterRecord, type MangaRecord } from "../sources/mangadex/mappers";
@@ -7,10 +8,12 @@ import type { MdChapter, MdCollectionResponse, MdEntityResponse, MdManga } from 
 import type { SearchParams } from "./catalog.schemas";
 import { Chapter, FeedCache, type ChapterCache, type FeedCacheAttrs } from "./chapter.model";
 import { toChapterDTO, toMangaDTO } from "./dto";
-import { Manga, type MangaCache } from "./manga.model";
+import { Manga, type AniListEnrichment, type MangaCache } from "./manga.model";
 
 export const MANGA_TTL_MS = 6 * 60 * 60 * 1000;
 export const CHAPTER_TTL_MS = 60 * 60 * 1000;
+/** Official links rarely change, and AniList allows ~90 requests a minute. */
+export const ANILIST_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 export const SEARCH_PAGE_SIZE = 24;
 /** How long a 404/400 from MangaDex for an id is remembered before retrying upstream. */
 export const NEGATIVE_CACHE_TTL_MS = 10 * 60 * 1000;
@@ -59,18 +62,19 @@ export class CatalogService {
   constructor(
     private readonly md: MangaDexApi,
     private readonly now: () => number = () => Date.now(),
+    private readonly anilist: AniListApi | null = null,
   ) {}
 
   async getManga(id: string): Promise<MangaDTO> {
     const cached = (await Manga.findOne({ source: "mangadex", sourceId: id }).lean()) as MangaCache | null;
-    if (cached && this.isFresh(cached.cachedAt, MANGA_TTL_MS)) return toMangaDTO(cached);
+    if (cached && this.isFresh(cached.cachedAt, MANGA_TTL_MS)) return toMangaDTO(await this.withAniList(cached));
     if (!cached && this.isNegativelyCached(this.mangaMisses, id)) throw mangaNotFound();
 
+    let record: MangaRecord;
     try {
       const res = await this.md.get<MdEntityResponse<MdManga>>(`/manga/${id}`, { includes: MANGA_INCLUDES });
-      const record = mapManga(res.data);
+      record = mapManga(res.data);
       await this.cacheManga([record]);
-      return toMangaDTO(record);
     } catch (err) {
       if (!(err instanceof MangaDexError)) throw err;
       if (cached) return toMangaDTO(cached);
@@ -79,6 +83,27 @@ export class CatalogService {
         throw mangaNotFound();
       }
       throw sourceUnavailable();
+    }
+    return toMangaDTO(
+      await this.withAniList({ ...record, anilistLinks: cached?.anilistLinks, anilistCheckedAt: cached?.anilistCheckedAt }),
+    );
+  }
+
+  /** Adds AniList's official English links when they are missing or stale. Never throws. */
+  private async withAniList<T extends MangaRecord & AniListEnrichment>(manga: T): Promise<T> {
+    if (!this.anilist || manga.anilistId === null || manga.anilistId === undefined) return manga;
+    if (manga.anilistCheckedAt && this.isFresh(manga.anilistCheckedAt, ANILIST_TTL_MS)) return manga;
+    try {
+      const anilistLinks = await this.anilist.englishLinks(manga.anilistId);
+      const anilistCheckedAt = new Date(this.now());
+      await Manga.updateOne(
+        { source: manga.source, sourceId: manga.sourceId },
+        { $set: { anilistLinks, anilistCheckedAt } },
+      );
+      return { ...manga, anilistLinks, anilistCheckedAt };
+    } catch {
+      // Leave anilistCheckedAt alone so the next title view tries again.
+      return manga;
     }
   }
 
@@ -100,8 +125,10 @@ export class CatalogService {
         status: params.status,
         originalLanguage: params.origin,
         contentRating: ratings,
-        availableTranslatedLanguage: [params.lang],
-        hasAvailableChapters: "true",
+        // Browsing lists only titles readable here; a title search also finds licensed series,
+        // whose pages point to the official English release instead.
+        availableTranslatedLanguage: params.q ? undefined : [params.lang],
+        hasAvailableChapters: params.q ? undefined : "true",
         [`order[${order}]`]: "desc",
       });
       const records = res.data.map(mapManga);

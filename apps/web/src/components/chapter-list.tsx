@@ -4,14 +4,19 @@ import { chapterLabel, formatDate, groupNames } from "@/lib/format";
 
 const row = "flex items-center justify-between gap-4 px-2 py-3 hover:bg-gutter";
 
-export function ChapterList({ chapters }: { chapters: ChapterDTO[] }) {
+/** `officialSite` names the first official English release, shown above the list, if there is one. */
+export function ChapterList({ chapters, officialSite }: { chapters: ChapterDTO[]; officialSite?: string }) {
   return (
     <section aria-labelledby="chapters-heading" className="mt-10">
       <h2 id="chapters-heading" className="font-display text-2xl">
         Chapters
       </h2>
       {chapters.length === 0 ? (
-        <p className="mt-3 text-dusk">No English chapters are on MangaDex for this title yet.</p>
+        <p className="mt-3 text-dusk">
+          {officialSite
+            ? `No English chapters are on MangaDex. Read it officially on ${officialSite} above.`
+            : "No English chapters are on MangaDex for this title yet."}
+        </p>
       ) : (
         <ul className="mt-3 divide-y divide-rule border-y border-rule">
           {[...chapters].reverse().map((chapter) => {

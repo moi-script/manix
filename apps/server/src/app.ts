@@ -17,16 +17,21 @@ import { ImageService } from "./modules/images/image.service";
 import { imagesRouter } from "./modules/images/images.routes";
 import { libraryRouter } from "./modules/library/library.routes";
 import { LibraryService } from "./modules/library/library.service";
+import { AniListClient, type AniListApi } from "./modules/sources/anilist/client";
 import type { MangaDexApi } from "./modules/sources/mangadex/client";
 
 export interface AppDeps {
   env: Env;
   mangadex: MangaDexApi;
   fetchImpl?: typeof fetch;
+  /** Defaults to a real AniList client; pass null to skip AniList enrichment. */
+  anilist?: AniListApi | null;
 }
 
-export function createApp({ env, mangadex, fetchImpl = fetch }: AppDeps) {
-  const catalog = new CatalogService(mangadex);
+export function createApp({ env, mangadex, fetchImpl = fetch, anilist }: AppDeps) {
+  const anilistClient =
+    anilist === undefined ? new AniListClient({ url: env.ANILIST_API_URL, userAgent: env.APP_USER_AGENT, fetchImpl }) : anilist;
+  const catalog = new CatalogService(mangadex, undefined, anilistClient);
   const pages = new ChapterPagesService(mangadex);
   const images = new ImageService({
     cache: new DiskCache(path.resolve(env.IMAGE_CACHE_DIR), env.IMAGE_CACHE_MAX_GB * 1024 ** 3),

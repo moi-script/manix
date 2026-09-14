@@ -99,6 +99,34 @@ describe("library, progress, and history", () => {
     expect(history.body.items.map((h: { chapterId: string }) => h.chapterId)).toEqual([CH2A, CH1]);
   });
 
+  it("saves the episode reached on the official site, adding the title as reading", async () => {
+    const agent = await registerAgent(app);
+
+    const saved = await agent.put(`/api/library/${MANGA_ID}/official-episode`).send({ episode: 45 });
+    expect(saved.status).toBe(200);
+    expect(saved.body.entry).toMatchObject({ mangaId: MANGA_ID, status: "reading", officialEpisode: 45 });
+
+    await agent.put(`/api/library/${MANGA_ID}`).send({ status: "completed" });
+    await agent.put(`/api/library/${MANGA_ID}/official-episode`).send({ episode: 46 });
+    const entry = (await agent.get(`/api/library/${MANGA_ID}`)).body.entry;
+    expect(entry).toMatchObject({ status: "completed", officialEpisode: 46 });
+    expect((await agent.get("/api/library")).body.entries[0].officialEpisode).toBe(46);
+  });
+
+  it("validates the official episode and requires login", async () => {
+    expect((await request(app).put(`/api/library/${MANGA_ID}/official-episode`).send({ episode: 1 })).status).toBe(401);
+    const agent = await registerAgent(app);
+    for (const episode of [-1, 1.5, "12", 100_001]) {
+      expect((await agent.put(`/api/library/${MANGA_ID}/official-episode`).send({ episode })).status).toBe(400);
+    }
+  });
+
+  it("reports no official episode for entries that never set one", async () => {
+    const agent = await registerAgent(app);
+    const added = await agent.put(`/api/library/${MANGA_ID}`).send({ status: "plan" });
+    expect(added.body.entry.officialEpisode).toBeNull();
+  });
+
   it("records each chapter once in history", async () => {
     const agent = await registerAgent(app);
     const body = { mangaId: MANGA_ID, chapterId: CH1, chapterNumber: "1", page: 1, totalPages: 20 };

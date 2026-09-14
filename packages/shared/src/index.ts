@@ -8,6 +8,12 @@ export interface TagDTO {
   group: string;
 }
 
+/** An official English publisher page for a title, e.g. its WEBTOON or Tapas series page. */
+export interface OfficialLinkDTO {
+  site: string;
+  url: string;
+}
+
 export interface MangaDTO {
   id: string;
   source: ContentSource;
@@ -23,6 +29,7 @@ export interface MangaDTO {
   authors: string[];
   artists: string[];
   sourceUpdatedAt: string | null;
+  officialLinks: OfficialLinkDTO[];
 }
 
 export interface GroupDTO {
@@ -78,6 +85,8 @@ export interface UserDTO {
 export interface LibraryEntryDTO {
   mangaId: string;
   status: ReadingStatus;
+  /** Episode the reader reached on the official site, which Manix can't see for itself. */
+  officialEpisode: number | null;
   updatedAt: string;
   manga: MangaDTO | null;
 }

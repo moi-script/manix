@@ -15,6 +15,7 @@ export function testEnv(overrides: Record<string, string> = {}): Env {
     MANGADEX_API_URL: "https://api.mangadex.test",
     MANGADEX_UPLOADS_URL: "https://uploads.mangadex.test",
     MANGADEX_REPORT_URL: "https://report.mangadex.test/report",
+    ANILIST_API_URL: "https://graphql.anilist.test",
     ...overrides,
   });
 }

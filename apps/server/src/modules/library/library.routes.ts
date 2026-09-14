@@ -7,6 +7,7 @@ import type { LibraryService } from "./library.service";
 const readingStatus = z.enum(["reading", "plan", "completed", "dropped"]);
 const listQuery = z.object({ status: readingStatus.optional() });
 const statusBody = z.object({ status: readingStatus });
+const officialEpisodeBody = z.object({ episode: z.number().int().min(0).max(100_000) });
 const historyQuery = z.object({ page: z.coerce.number().int().min(1).max(1000).default(1) });
 const progressBody = z.object({
   mangaId: z.string().uuid(),
@@ -31,6 +32,12 @@ export function libraryRouter(library: LibraryService): Router {
   router.put("/library/:mangaId", requireAuth, async (req, res) => {
     const { status } = statusBody.parse(req.body);
     res.json({ entry: await library.set(currentUserId(req), uuidParam.parse(req.params.mangaId), status) });
+  });
+
+  router.put("/library/:mangaId/official-episode", requireAuth, async (req, res) => {
+    const { episode } = officialEpisodeBody.parse(req.body);
+    const mangaId = uuidParam.parse(req.params.mangaId);
+    res.json({ entry: await library.setOfficialEpisode(currentUserId(req), mangaId, episode) });
   });
 
   router.delete("/library/:mangaId", requireAuth, async (req, res) => {

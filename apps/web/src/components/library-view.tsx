@@ -100,7 +100,19 @@ export function LibraryView() {
           {state.entries.map((entry) => (
             <li key={entry.mangaId}>
               {entry.manga ? (
-                <MangaCard manga={entry.manga} />
+                <>
+                  <MangaCard manga={entry.manga} />
+                  {entry.officialEpisode !== null && entry.manga.officialLinks[0] && (
+                    <a
+                      href={entry.manga.officialLinks[0].url}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-1 block text-xs text-marker hover:underline"
+                    >
+                      Episode {entry.officialEpisode} · {entry.manga.officialLinks[0].site} <span aria-hidden>↗</span>
+                    </a>
+                  )}
+                </>
               ) : (
                 <Link href={`/title/${entry.mangaId}`} className="text-sm text-dusk underline underline-offset-2">
                   Open saved title

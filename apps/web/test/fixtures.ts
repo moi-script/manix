@@ -23,6 +23,7 @@ export const sampleManga: MangaDTO = {
   authors: ["Chugong"],
   artists: ["DUBU (REDICE STUDIO)"],
   sourceUpdatedAt: "2024-05-01T10:00:00.000Z",
+  officialLinks: [],
 };
 
 export const sampleChapters: ChapterDTO[] = [

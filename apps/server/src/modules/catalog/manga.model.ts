@@ -1,11 +1,19 @@
 import { Schema, model } from "mongoose";
+import type { OfficialLinkDTO } from "@manix/shared";
 import type { MangaRecord } from "../sources/mangadex/mappers";
 
-export interface MangaCache extends MangaRecord {
+/** AniList enrichment lives beside, not inside, the MangaDex record so a MangaDex refresh keeps it. */
+export interface AniListEnrichment {
+  anilistLinks?: OfficialLinkDTO[];
+  anilistCheckedAt?: Date | null;
+}
+
+export interface MangaCache extends MangaRecord, AniListEnrichment {
   cachedAt: Date;
 }
 
 const tagSchema = new Schema({ id: String, name: String, group: String }, { _id: false, id: false });
+const linkSchema = new Schema({ site: String, url: String }, { _id: false, id: false });
 
 const mangaSchema = new Schema<MangaCache>({
   source: { type: String, required: true, enum: ["mangadex", "local"] },
@@ -22,6 +30,10 @@ const mangaSchema = new Schema<MangaCache>({
   authors: { type: [String], default: [] },
   artists: { type: [String], default: [] },
   sourceUpdatedAt: { type: Date, default: null },
+  mangadexLinks: { type: [linkSchema], default: [] },
+  anilistId: { type: Number, default: null },
+  anilistLinks: { type: [linkSchema], default: [] },
+  anilistCheckedAt: { type: Date, default: null },
   cachedAt: { type: Date, required: true },
 });
 

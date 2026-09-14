@@ -1,7 +1,13 @@
 import request from "supertest";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { Chapter } from "../src/modules/catalog/chapter.model";
-import { CatalogService, findNeighbors, NEGATIVE_CACHE_TTL_MS } from "../src/modules/catalog/catalog.service";
+import {
+  ANILIST_TTL_MS,
+  CatalogService,
+  findNeighbors,
+  MANGA_TTL_MS,
+  NEGATIVE_CACHE_TTL_MS,
+} from "../src/modules/catalog/catalog.service";
 import { Manga } from "../src/modules/catalog/manga.model";
 import { BlockedGroup } from "../src/modules/moderation/blocked-group.model";
 import { MangaDexError, type Query } from "../src/modules/sources/mangadex/client";
@@ -109,7 +115,6 @@ describe("catalog", () => {
       originalLanguage: ["ko"],
       status: ["completed"],
       contentRating: ["safe", "suggestive"],
-      availableTranslatedLanguage: ["en"],
       "order[relevance]": "desc",
     });
     expect(await Manga.countDocuments({ sourceId: MANGA_ID })).toBe(1);
@@ -181,6 +186,84 @@ describe("catalog", () => {
     now = NEGATIVE_CACHE_TTL_MS + 1;
     await expect(service.getManga(unknownId)).rejects.toMatchObject({ code: "manga_not_found" });
     expect(fake.get).toHaveBeenCalledTimes(2);
+  });
+
+  it("does not require English chapters when searching by title, so licensed series can be found", async () => {
+    fake.handlers["/manga"] = { result: "ok", data: [], limit: 24, offset: 0, total: 0 };
+    await request(app).get("/api/manga?q=ragnarok");
+    const query = fake.get.mock.calls[0][1] as Query;
+    expect(query.title).toBe("ragnarok");
+    expect(query.availableTranslatedLanguage).toBeUndefined();
+    expect(query.hasAvailableChapters).toBeUndefined();
+  });
+
+  it("still only browses titles with English chapters when there is no search text", async () => {
+    fake.handlers["/manga"] = { result: "ok", data: [], limit: 24, offset: 0, total: 0 };
+    await request(app).get("/api/manga");
+    expect(fake.get.mock.calls[0][1]).toMatchObject({ availableTranslatedLanguage: ["en"], hasAvailableChapters: "true" });
+  });
+
+  describe("official English links", () => {
+    const WEBTOON = "https://www.webtoons.com/en/action/solo/list?title_no=1";
+    const TAPPYTOON = "https://www.tappytoon.com/en/book/solo";
+
+    function withLinks() {
+      const entity = mangaEntity();
+      entity.data.attributes.links = { al: "105398", engtl: WEBTOON };
+      fake.handlers[`/manga/${MANGA_ID}`] = entity;
+    }
+
+    it("merges the MangaDex link with AniList's English links and caches AniList for 7 days", async () => {
+      withLinks();
+      let now = Date.parse("2026-09-01T00:00:00Z");
+      const englishLinks = vi.fn(async () => [
+        { site: "WEBTOON", url: WEBTOON },
+        { site: "Tappytoon", url: TAPPYTOON },
+      ]);
+      const service = new CatalogService(fake.api, () => now, { englishLinks });
+
+      const manga = await service.getManga(MANGA_ID);
+      expect(manga.officialLinks).toEqual([
+        { site: "WEBTOON", url: WEBTOON },
+        { site: "Tappytoon", url: TAPPYTOON },
+      ]);
+      expect(englishLinks).toHaveBeenCalledWith(105398);
+
+      now += MANGA_TTL_MS + 1; // MangaDex refetch must keep the stored AniList links
+      expect((await service.getManga(MANGA_ID)).officialLinks).toHaveLength(2);
+      expect(englishLinks).toHaveBeenCalledTimes(1);
+
+      now += ANILIST_TTL_MS;
+      await service.getManga(MANGA_ID);
+      expect(englishLinks).toHaveBeenCalledTimes(2);
+    });
+
+    it("falls back to the MangaDex link and retries AniList next time when it fails", async () => {
+      withLinks();
+      const englishLinks = vi.fn().mockRejectedValueOnce(new Error("timeout")).mockResolvedValue([{ site: "Tappytoon", url: TAPPYTOON }]);
+      const service = new CatalogService(fake.api, () => Date.now(), { englishLinks });
+
+      expect((await service.getManga(MANGA_ID)).officialLinks).toEqual([{ site: "WEBTOON", url: WEBTOON }]);
+      expect((await service.getManga(MANGA_ID)).officialLinks).toEqual([
+        { site: "WEBTOON", url: WEBTOON },
+        { site: "Tappytoon", url: TAPPYTOON },
+      ]);
+    });
+
+    it("does not call AniList when the title has no AniList id", async () => {
+      const englishLinks = vi.fn(async () => []);
+      const service = new CatalogService(fake.api, () => Date.now(), { englishLinks });
+      expect((await service.getManga(MANGA_ID)).officialLinks).toEqual([]);
+      expect(englishLinks).not.toHaveBeenCalled();
+    });
+
+    it("includes MangaDex links in search results without calling AniList", async () => {
+      const entity = mangaEntity();
+      entity.data.attributes.links = { al: "105398", engtl: WEBTOON };
+      fake.handlers["/manga"] = { result: "ok", data: [entity.data], limit: 24, offset: 0, total: 1 };
+      const res = await request(app).get("/api/manga?q=solo");
+      expect(res.body.items[0].officialLinks).toEqual([{ site: "WEBTOON", url: WEBTOON }]);
+    });
   });
 });
 

@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 import { ChapterList } from "@/components/chapter-list";
+import { OfficialLinks } from "@/components/official-links";
 import { ReadActions } from "@/components/read-actions";
 import { ApiError } from "@/lib/api";
 import { plainDescription, statusLabel } from "@/lib/format";
@@ -101,7 +102,9 @@ export default async function TitlePage({ params }: { params: Params }) {
             <p className="mt-8 max-w-prose whitespace-pre-line leading-relaxed text-paper/90">{description}</p>
           )}
 
-          <ChapterList chapters={chapters} />
+          <OfficialLinks mangaId={manga.id} links={manga.officialLinks} />
+
+          <ChapterList chapters={chapters} officialSite={manga.officialLinks[0]?.site} />
         </div>
       </div>
     </article>

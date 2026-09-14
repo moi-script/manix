@@ -1,4 +1,5 @@
-import type { ContentSource, GroupDTO, TagDTO } from "@manix/shared";
+import type { ContentSource, GroupDTO, OfficialLinkDTO, TagDTO } from "@manix/shared";
+import { linksFromMangaDex } from "../official-links";
 import type { LocalizedString, MdChapter, MdManga, MdRelationship } from "./types";
 
 export interface MangaRecord {
@@ -16,6 +17,8 @@ export interface MangaRecord {
   authors: string[];
   artists: string[];
   sourceUpdatedAt: Date | null;
+  mangadexLinks: OfficialLinkDTO[];
+  anilistId: number | null;
 }
 
 export interface ChapterRecord {
@@ -76,6 +79,8 @@ export function mapManga(raw: MdManga): MangaRecord {
     authors: relationshipNames(raw.relationships, "author"),
     artists: relationshipNames(raw.relationships, "artist"),
     sourceUpdatedAt: a.updatedAt ? new Date(a.updatedAt) : null,
+    mangadexLinks: linksFromMangaDex(a.links),
+    anilistId: /^\d{1,9}$/.test(a.links?.al ?? "") ? Number(a.links?.al) : null,
   };
 }
 
