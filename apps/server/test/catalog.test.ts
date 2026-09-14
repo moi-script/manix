@@ -197,7 +197,7 @@ describe("catalog", () => {
     expect(query.hasAvailableChapters).toBeUndefined();
   });
 
-  it("ranks title search results readable in English or officially available above the rest", async () => {
+  it("ranks title search results with English chapters first, then official releases, then the rest", async () => {
     const make = (id: string, attributes: Record<string, unknown>) => {
       const entity = mangaEntity().data;
       return { ...entity, id, attributes: { ...entity.attributes, title: { en: id }, ...attributes } };
@@ -206,8 +206,8 @@ describe("catalog", () => {
       result: "ok",
       data: [
         make("novel", { availableTranslatedLanguages: ["ko"], links: {} }),
-        make("readable", { availableTranslatedLanguages: ["en", "ko"] }),
-        make("licensed", { availableTranslatedLanguages: [], links: { engtl: "https://www.webtoons.com/en/x" } }),
+        make("book-edition", { availableTranslatedLanguages: [], links: { engtl: "https://yenpress.com/series/x" } }),
+        make("readable", { availableTranslatedLanguages: ["en", "ko"], links: { engtl: "https://www.webtoons.com/en/x" } }),
         make("pre-serialization", { availableTranslatedLanguages: null }),
       ],
       limit: 24,
@@ -218,7 +218,7 @@ describe("catalog", () => {
     const res = await request(app).get("/api/manga?q=solo");
     expect(res.body.items.map((m: { title: string }) => m.title)).toEqual([
       "readable",
-      "licensed",
+      "book-edition",
       "novel",
       "pre-serialization",
     ]);

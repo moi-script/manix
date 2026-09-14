@@ -55,9 +55,12 @@ export function findNeighbors(
 }
 
 function rankReadableFirst(manga: MdManga[], language: string): MdManga[] {
-  const readable = (m: MdManga) =>
-    (m.attributes.availableTranslatedLanguages ?? []).includes(language) || Boolean(m.attributes.links?.engtl);
-  return [...manga.filter(readable), ...manga.filter((m) => !readable(m))];
+  const tier = (m: MdManga) =>
+    (m.attributes.availableTranslatedLanguages ?? []).includes(language) ? 0 : m.attributes.links?.engtl ? 1 : 2;
+  return manga
+    .map((m, index) => ({ m, index, tier: tier(m) }))
+    .sort((a, b) => a.tier - b.tier || a.index - b.index)
+    .map(({ m }) => m);
 }
 
 export class CatalogService {
@@ -137,8 +140,9 @@ export class CatalogService {
         hasAvailableChapters: params.q ? undefined : "true",
         [`order[${order}]`]: "desc",
       });
-      // A title search no longer filters by language, so rank what can actually be read (here or
-      // officially) above novel editions and placeholder entries, keeping MangaDex's order otherwise.
+      // A title search no longer filters by language, so rank titles readable here first, then ones
+      // with an official English release, then novel editions and placeholders, keeping MangaDex's
+      // relevance order within each tier.
       const ranked = params.q ? rankReadableFirst(res.data, params.lang) : res.data;
       const records = ranked.map(mapManga);
       await this.cacheManga(records);
